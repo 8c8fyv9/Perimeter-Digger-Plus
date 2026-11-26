@@ -1,18 +1,18 @@
 # Gradle & local build outputs
-.gradle/
-build/
-out/
-classes/
-printer-patch/classes/
+/.gradle/
+/build/
+/out/
+/classes/
+/printer-patch/classes/
 baritone/.gradle/
-baritone/build/
-baritone/out/
-baritone/bin/
+/baritone/build/
+/baritone/out/
+/baritone/bin/
 
 # Local dependencies & logs
-deps/
+/deps/
 baritone/deps/
-logs/
+/logs/
 *.log
 
 # IDE
