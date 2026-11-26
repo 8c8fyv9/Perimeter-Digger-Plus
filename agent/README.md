@@ -8,6 +8,7 @@ Loopback-only (`127.0.0.1:18769`) Bearer-token HTTP API exposing `/perimeterdig`
 
 Create an empty file `config/perimeter-digger-plus/agent-api/enabled` or add JVM flag `-Dperimeterdig.api.enabled=true` (optional port override: `-Dperimeterdig.api.port=18769`).
 On startup, the active URL and random token are written to `config/perimeter-digger-plus/agent-api/connection.json` (local secret — do not share or commit).
+Optional world/chunk snapshot endpoints (`/v1/world`, `/v1/chunks`, `/v1/chunk`, `/v1/entities`) are enabled alongside the Agent API unless disabled via `-Dperimeterdig.api.world=false` or an empty `world-disabled` marker file.
 
 ## Node.js Client (`client.mjs`, Node 18+)
 
@@ -42,6 +43,10 @@ All requests require `Authorization: Bearer <token>`.
 | `GET /v1/commands` | List all `/perimeterdig` command syntax from the live Brigadier tree. |
 | `POST /v1/commands` | Execute a mod command (`{"command": "config show"}`). |
 | `GET /v1/status` | Current automation state, world, dimension, and task progress. |
+| `GET /v1/world` | Current world, dimension, player position/chunk, and Y bounds *(optional)*. |
+| `GET /v1/chunks?radius=<r>` | List loaded `[cx, cz]` client chunks (optionally filtered around player) *(optional)*. |
+| `GET /v1/chunk?cx=<x>&cz=<z>` | Full block/biome palette & block-entity snapshot of a loaded chunk *(optional)*. |
+| `GET /v1/entities?items=true` | Loaded entities or item drops around the player *(optional)*. |
 | `POST /v1/tasks/plan` | Cuboid geometry preview (non-destructive). |
 | `POST /v1/tasks` | Start a cuboid task (`taskId`, `world`, `dimension`, `from`, `to` inclusive). |
 | `POST /v1/tasks/pause \| resume \| stop` | Control an active cuboid task (`{"taskId": "..."}`). |

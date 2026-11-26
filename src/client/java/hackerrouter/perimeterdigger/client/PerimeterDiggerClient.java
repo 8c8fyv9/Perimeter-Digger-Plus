@@ -93,8 +93,21 @@ public final class PerimeterDiggerClient implements ClientModInitializer {
 		var commands = new hackerrouter.perimeterdigger.client.api.CommandApi<>(apiDispatcher, hackerrouter.perimeterdigger.client.api.MinecraftCommandSource::create);
 		var apiConfig = net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("perimeter-digger-plus/agent-api");
 		boolean enabled = Boolean.parseBoolean(System.getProperty("perimeterdig.api.enabled", Boolean.toString(java.nio.file.Files.exists(apiConfig.resolve("enabled")))));
+		boolean worldEnabled = Boolean.parseBoolean(System.getProperty("perimeterdig.api.world", Boolean.toString(!java.nio.file.Files.exists(apiConfig.resolve("world-disabled")))));
+		var worldApi = new hackerrouter.perimeterdigger.client.api.WorldSnapshotApi(worldEnabled);
 		if (enabled) {
-			try { agentServer = hackerrouter.perimeterdigger.client.api.AgentHttpServer.start(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("perimeter-digger-plus/agent-api"), (method, path, body) -> path.equals("/v1/commands") ? commands.route(method, path, body) : agentTasks.route(method, path, body), net.minecraft.client.Minecraft.getInstance()::execute); }
+			try {
+				agentServer = hackerrouter.perimeterdigger.client.api.AgentHttpServer.start(
+						apiConfig,
+						(method, path, body) -> {
+							if (path.equals("/v1/commands")) return commands.route(method, path, body);
+							if (path.equals("/v1/world") || path.equals("/v1/chunks") || path.equals("/v1/chunk") || path.equals("/v1/entities")) {
+								return worldApi.route(method, path, body);
+							}
+							return agentTasks.route(method, path, body);
+						},
+						net.minecraft.client.Minecraft.getInstance()::execute);
+			}
 			catch (java.io.IOException e) { PerimeterDigger.LOGGER.error("Agent API failed to start; mining mod remains available", e); }
 			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { if (agentServer != null) agentServer.close(); });
 		}

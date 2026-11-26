@@ -184,6 +184,14 @@ test("all semantic actions, auth, task body and no retries", async () => {
     await api.commands(); await api.command("config show");
     assert.equal(calls[6].method,"GET"); assert.equal(new URL(calls[6].url).pathname,"/v1/commands");
     assert.deepEqual(JSON.parse(calls[7].body),{command:"config show"});
+    await api.world(); await api.chunks(4); await api.chunk(10, -5); await api.entities(true);
+    assert.equal(new URL(calls[8].url).pathname, "/v1/world");
+    assert.equal(new URL(calls[9].url).pathname + new URL(calls[9].url).search, "/v1/chunks?radius=4");
+    assert.equal(new URL(calls[10].url).pathname + new URL(calls[10].url).search, "/v1/chunk?cx=10&cz=-5");
+    assert.equal(new URL(calls[11].url).pathname + new URL(calls[11].url).search, "/v1/entities?items=true");
+    const worldApi = readFileSync(new URL("../src/client/java/hackerrouter/perimeterdigger/client/api/WorldSnapshotApi.java", import.meta.url), "utf8");
+    assert.ok(worldApi.includes("WORLD_SNAPSHOT_DISABLED"));
+    assert.ok(worldApi.includes("client_received_data_only"));
     let failures=0; globalThis.fetch=async()=>{failures++;throw new Error("timeout");};
     await assert.rejects(api.start(task), /timeout/); assert.equal(failures,1);
     globalThis.fetch=async()=>({ok:false,status:409,json:async()=>({error:"BUSY"})});

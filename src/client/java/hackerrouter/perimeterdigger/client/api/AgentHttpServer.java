@@ -36,9 +36,15 @@ public final class AgentHttpServer implements AutoCloseable {
         try {
             if(ex.getRequestHeaders().containsKey("Origin")||!("Bearer "+token).equals(ex.getRequestHeaders().getFirst("Authorization")))throw new SecurityException("Unauthorized");
             String method=ex.getRequestMethod(),path=ex.getRequestURI().getPath();
-            if(!(method.equals("GET")&&(path.equals("/v1/status") || path.equals("/v1/commands")))&&!method.equals("POST"))throw new IllegalArgumentException("Unsupported method");
+            if(!(method.equals("GET")&&Set.of("/v1/status","/v1/commands","/v1/world","/v1/chunks","/v1/chunk","/v1/entities").contains(path))&&!method.equals("POST"))throw new IllegalArgumentException("Unsupported method");
             byte[] bytes=ex.getRequestBody().readNBytes(8193);if(bytes.length>8192)throw new IllegalArgumentException("Body exceeds 8192 bytes");
             JsonObject input=bytes.length==0?new JsonObject():JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();
+            if(method.equals("GET")&&ex.getRequestURI().getRawQuery()!=null){
+                for(String pair:ex.getRequestURI().getRawQuery().split("&")){
+                    int eq=pair.indexOf('=');
+                    if(eq>0){input.addProperty(URLDecoder.decode(pair.substring(0,eq),StandardCharsets.UTF_8),URLDecoder.decode(pair.substring(eq+1),StandardCharsets.UTF_8));}
+                }
+            }
             var future=new CompletableFuture<Object>();
             dispatch.accept(()->{if(future.isCancelled())return;try{future.complete(router.route(method,path,input));}catch(RuntimeException e){future.completeExceptionally(e);}});
             try{result=future.get(10,TimeUnit.SECONDS);}catch(TimeoutException e){future.cancel(false);code=504;result=Map.of("code","OUTCOME_UNKNOWN","error","Query status; do not submit a new taskId to retry");}

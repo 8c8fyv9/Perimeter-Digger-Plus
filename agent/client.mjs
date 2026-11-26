@@ -22,6 +22,10 @@ export class PerimeterAgent {
   commands() { return this.request("GET", "/v1/commands"); }
   command(command) { return this.request("POST", "/v1/commands", {command}); }
   status() { return this.request("GET", "/v1/status"); }
+  world() { return this.request("GET", "/v1/world"); }
+  chunks(radius) { return this.request("GET", radius === undefined ? "/v1/chunks" : `/v1/chunks?radius=${encodeURIComponent(radius)}`); }
+  chunk(cx, cz) { return this.request("GET", `/v1/chunk?cx=${encodeURIComponent(cx)}&cz=${encodeURIComponent(cz)}`); }
+  entities(itemsOnly = false) { return this.request("GET", itemsOnly ? "/v1/entities?items=true" : "/v1/entities"); }
   plan(task) { return this.request("POST", "/v1/tasks/plan", task); }
   start(task) { return this.request("POST", "/v1/tasks", task); }
   pause(taskId) { return this.request("POST", "/v1/tasks/pause", {taskId}); }
