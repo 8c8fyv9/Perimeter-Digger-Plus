@@ -1,302 +1,252 @@
-# Perimeter Digger
+# Perimeter Digger Plus
 
-[简体中文](README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md)
 
-Perimeter Digger is a Fabric mod for Minecraft 26.1.1 that uses a modified Baritone build to automate large-scale excavation.
+[![Minecraft](https://img.shields.io/badge/Minecraft-26.2-52A535?logo=minecraft&logoColor=white)](https://minecraft.net)
+[![Mod Loader](https://img.shields.io/badge/Loader-Fabric%200.20.1%2B-DBD0B4)](https://fabricmc.net)
+[![Java](https://img.shields.io/badge/Java-25%2B-ED8B00)](https://adoptium.net)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
 
-------
+An enhanced fork of [HackerRouter/Perimeter-Digger](https://github.com/HackerRouter/Perimeter-Digger) for Minecraft — an all-in-one client-side **automated area-mining & layer-by-layer schematic-building mod** bundling its customized Baritone fork via Jar-in-Jar. Includes a full in-game `F9` configuration GUI, translucent 3D selection overlay, one-click Litematica footprint import, `/fly` 3D aerial mining & printing, optimized water placement, configurable downward bubble-column escape, smart backpack tool/food/shulker resupply, bottom-layer protection, and hardened anti-stall & combat recovery.
 
-### Required mod:
-### [Modified Baritone](https://github.com/HackerRouter/baritone/releases)
+> **中文简介：** 本仓库为基于 [HackerRouter/Perimeter-Digger](https://github.com/HackerRouter/Perimeter-Digger) 增强开发的 **空置域自动挖掘与逐层投影建造增强版（Perimeter Digger Plus）**，单包内置自定义 Baritone（无需额外下载）。完整中文文档请阅读 **[简体中文 README](README.zh-CN.md)**。
+>
+> **Current Support:** Minecraft `26.2` · Fabric Loader `0.20.1+` · Fabric API · Java `25+`  
+> **Mod ID:** `perimeter-digger-plus` (uses its own config directory `config/perimeter-digger-plus/` and declares `breaks: perimeter-digger` to prevent conflicts with upstream).
 
-### Tutorial Video of Perimeter Digger: [BV1yFK56cESA](https://www.bilibili.com/video/BV1yFK56cESA)
+---
 
-------
+## Table of Contents
 
-It supports:
+- [Highlights](#highlights)
+- [Installation & Quick Start](#installation--quick-start)
+- [In-Game Configuration GUI (`F9`)](#in-game-configuration-gui-f9)
+- [Command Reference](#command-reference)
+- [Configuration & Compatibility Notes](#configuration--compatibility-notes)
+- [Optional Local Agent HTTP API](#optional-local-agent-http-api)
+- [Building & Testing from Source](#building--testing-from-source)
+- [Repository Layout](#repository-layout)
+- [Roadmap](#roadmap)
+- [License & Attribution](#license--attribution)
 
-- Excavating irregular XZ areas
-- Sealing fluids along the excavation boundary and handling fluids inside it
-- Automatically collecting drops
-- Automatically unloading at the nearest unloading point
-- Restocking consumables (fireworks and food) at a supply point
-- Replacing low-durability tools and Elytra at a supply point
-- Traveling across dimensions to repair tools and Elytra at XP furnaces
-- Automatically sleeping
-- Walking and Elytra pathfinding
+---
 
-## Requirements
+## Highlights
 
-- Minecraft 26.1.1
-- Fabric Loader 0.19.3 or newer
-- Fabric API
-- Java 25 or newer
-- **[Modified Baritone](https://github.com/HackerRouter/baritone/releases)**
+### Distribution & User Interface
+- **Single All-in-One JAR (Jar-in-Jar)**: Bundles the customized [`baritone/`](baritone/) fork inside the mod JAR. Drop one file into `mods/` — no separate Baritone download needed.
+- **Full 5-Tab In-Game Configuration Screen (`F9`)**:
+  - **Tap `F9`**: Start / pause / resume automation (`Esc` stops automation only when no GUI screen is open).
+  - **Hold `F9` (~400 ms)**: Open the full settings UI without touching JSON files or commands.
+- **One-Click Litematica Footprint Import**:
+  - Click **Read Litematica (`读取投影`)** in the `F9` Area tab or run `/perimeterdig plan litematica`.
+  - Zero hard dependency on Litematica (optional runtime reflection): automatically selects the active placement (or nearest enabled placement), merges rotated/mirrored sub-regions into exact world bounds, clamps to world height, and reports clear messages if Litematica is not installed, no placement exists, or data is incompatible.
+- **Translucent 3D Selection Overlay**:
+  - Native Fabric `LevelRenderEvents.COLLECT_SUBMITS` + `DrawableGizmoPrimitives` rendering for both rectangles and scanned polygons, isolated per dimension and updated live when bounds change.
 
-Unmodified Baritone does not include custom-XZ area mining or the extended Elytra/pathfinding APIs required by this mod.
+### Layer-by-Layer Automated Schematic Building (`模式: 投影打印`)
+- **Automated Schematic Printing** (zero hard dependency on Litematica / `litematica-printer`):
+  - Switch between **Auto Mining** and **Schematic Printing** directly inside the `F9` screen.
+  - Steps Litematica's single-layer render range from `minY` to `maxY`, tallies per-layer materials & buildable-layer sufficiency (including chests, barrels, placed shulker boxes, and nested/carried shulkers via a 3-view materials screen), and supports configurable missing-material & wrong-block policies (`skip` vs. `break_and_place`, plus optional clearing of extra blocks).
+  - Automatically navigates via `/fly` or Baritone ground walking (with `lastAnchorPos` locality weighting to prevent corridor ping-pong) and restores original `LayerRange` and `PRINT_MODE` on pause/stop/completion.
+  - **Multi-Point Chest & Shulker Resupply (`SchematicResourceController`)**: Automatically restocks missing blocks, water buckets, food, healthy tools, and scaffold blocks from configured resource chests/shulker boxes or safely places/unloads/re-mines carried shulker boxes.
+  - **Exact Sign Placement (`SchematicSignPlacer`)**: Directly places standing signs (16 rotations), wall signs (4 facings), and hanging signs with synchronized yaw/pitch packets and automatic sign-edit screen dismissal.
+- **Optimized Water Placement (`WaterSourceOptimizer` + `SchematicWaterPlacer`)**:
+  - Handles waterlogged blocks (`waterlogged=true`) and water source pools after each layer's solid containment blocks finish.
+  - Uses Minecraft's native 2-neighbor source conversion to hit the exact $\lceil (W + L) / 2 \rceil$ perimeter lower bound on rectangular pools (e.g., 10 buckets for 10×10, 30 buckets for 20×40) and lookahead closure greedy + pruning on irregular pools.
+  - Automatically merges scattered empty buckets and refills from nearby safe self-regenerating water sources in Survival (2 water buckets suffice for arbitrarily large pools), with inner-wall eye-side clearance and 5-ray quantized aim safety checks to prevent outer spills.
+- **Optional `litematica-printer` 26.2-3.2.2 Compatibility Patch (`printer-patch/`)**:
+  - Fixes 5 upstream placement bugs when `printInAir=true` or when building complex redstone/farm schematics: top/bottom/double slabs (`SlabGuide`), redstone/wall torches (`TorchGuide` registered for `BaseTorchBlock`), fences/gates/walls (`GuesserGuide` + atomic `ActionHandler`), wall/standing/hanging signs (`RotatingBlockGuide`), and log stripping axis preservation (`LogGuide` / `LogStrippingGuide`).
 
-## Installation
+### Mining Engines & Strategies
+- **Three Switchable Top-Down Clearing Strategies** (shared by both ground Baritone & `/fly` engines):
+  - `global_top_down`: Strictly clears the highest remaining Y layer across the entire selection first.
+  - `local_top_down`: Clears local peaks/towers layer-by-layer before advancing to the next region.
+  - `chunk_top_down`: Clears the nearest chunk within the selection top-down before moving to the next chunk.
+- **`/fly` 3D Aerial Navigation & Mining**:
+  - Automatically engages when enabled and the player has `mayfly` permission, avoiding terrain and liquid pathing issues.
+  - Smart open-direction obstacle detouring under overhangs/canopies, and automatic in-place clearing of blocking in-area blocks if flight stalls against walls or foliage.
+- **Block Whitelist / Blacklist + Sealed-Pocket Detection**:
+  - Optional **Mining Whitelist** (protected blocks to skip) and **Mining Blacklist** (mine only explicitly listed blocks), synced into Baritone pathing costs and paired with a bounded 3D reverse-BFS `SealedPocketDetector` so enclosed/unreachable pockets do not deadlock the job.
 
-1. Install Fabric Loader for Minecraft 26.1.1.
-2. Put Fabric API, the latest [Modified Baritone](https://github.com/HackerRouter/baritone/releases), and [Perimeter Digger](https://github.com/HackerRouter/Perimeter-Digger/releases) in the client `mods` directory.
+### Downward Bubble-Column Pathfinding & Escape + Safety Hardening
+- **Downward Bubble-Column (`BUBBLE_COLUMN[drag=true]`) Pathfinding & Configurable Escape (`BubbleColumnEscapeController`)**:
+  - Baritone pathfinding explicitly accounts for downward bubble-column drag physics (`canWalkOnPosition`, `MovementPillar`, `MovementAscend`, `MovementTraverse`, `MovementDescend`): refuses to treat floating cells above downward columns as swim-walkable, forbids impossible in-column swimming/jumping, and applies high hazard penalties while allowing passive sneak-walking on magma floors.
+  - Selectable escape strategy (`bubbleColumnEscapeMode` in `F9` GUI or `/perimeterdig config set bubble_escape_mode <mode>`):
+    - `auto` *(default)*: `/fly` lift -> zero-collision / bottom-slab magma capping (converts column to normal water in 5 ticks without jumping) -> safe empty-bucket scoop + pillar -> horizontal sneak walk.
+    - `scaffold_first`: prioritizes capping magma floor with zero-collision blocks or `<=0.5` step-up slabs/trapdoors.
+    - `bucket_first`: prioritizes scooping the bubble column with an empty bucket to break drag and pillar out.
+    - `walk_or_fly`: never places temporary blocks or scoops water; exits strictly via `/fly` or horizontal magma-sneak walking.
+- **Smart Backpack Tool & Food Management**:
+  - Automatic best-tool swapping from backpack to hotbar (`autoSwapBackpackTool`), automatic replacement of low-durability tools with healthier backpack tools (`autoReplaceLowDurabilityTool`), and a standalone `durabilityProtection` toggle.
+  - Automatic backpack-to-hotbar food swapping when hungry or below health threshold (`autoSwapBackpackFood`) without displacing tools or sealing blocks, with mid-meal refill and slot restoration.
+- **Independent Scaffold Blocks & Sealing Blocks**:
+  - Configure **Sealing Blocks** (for water/lava sealing) and **Scaffold Blocks** (synced to Baritone `acceptableThrowawayItems` for pillaring/bridging) independently in the `F9` Blocks & Items tab; leave Scaffold Blocks empty to use Baritone defaults + sealing blocks.
+- **Bottom-Layer `minY - 1` & Scaffold Self-Mining Protection**:
+  - Enforced in both A\* path planning (`breakCostMultiplierAt`) and execution (`BlockBreakHelper`) so bottom-layer clearing never digs below `diggingMinY`.
+  - Tracks throwaway scaffold blocks (`ScaffoldTracker`), protects them while climbing/bridging, and cleans them up once no other targets remain.
+- **Anti-Stall, Anti-Ping-Pong & Retaliation Hardening**:
+  - Uses `REVALIDATE_GOAL_AND_PATH` for area mining, escalating target deferrals (`45s -> 180s -> skip`) + `StuckCellPenalty`, bounded cross-area transit grace, and hardened liquid handling.
+  - Mob retaliation automatically closes open container/inventory/GUI screens (`closeContainer()` + `setScreen(null)`), re-equips swords/axes, aborts unreachable attackers quickly, and finishes critical low-health bites before engaging.
 
-All commands are client-side commands and support basic Tab completion.
-The interface follows the language selected in Minecraft and currently includes English and Simplified Chinese.
+---
 
-## Features
+## Installation & Quick Start
 
-- Detect an irregular enclosed XZ excavation area from a chosen boundary block at one Y level.
-- Plan an inclusive rectangular XZ excavation area directly from coordinates.
-- Excavate the selected columns through a specified Y range.
-- Avoid, replace, or seal fluids with configurable blocks.
-- Mine according to the remaining inventory capacity and collect nearby drops.
-- When the inventory is full, travel to the nearest vertical unloading shaft and discard excavation products.
-- Monitor tool and Elytra durability.
-- Replace low-durability tools locally or travel to a supply point or XP furnaces, with cross-dimensional repair enabled by default.
-- Automatically eat, restock food and fireworks, and optionally sleep at night.
-- Use walking and Elytra pathfinding.
-- Store configuration separately for each server or single-player save.
+### Prerequisites
+- Minecraft **26.2**
+- **Fabric Loader 0.20.1+** and **Fabric API**
+- **Java 25+**
+- *(Optional)* **Litematica** (and `litematica-printer` for automated schematic printing; use the patched `litematica-printer-26.2-3.2.2-patched.jar` if building slabs/torches/fences/signs/stripped logs with `printInAir=true`)
 
-## Quick start
+### Setup
+1. Place `perimeter-digger-plus-<version>.jar` into your `.minecraft/mods/` directory.
+   > **Important:** Do **not** install a standalone Baritone JAR or upstream `perimeter-digger` alongside Perimeter Digger Plus. Baritone is already bundled inside the JAR.
+2. Launch the game and enter your world.
+3. **Hold `F9`** (~400 ms) to open the configuration screen:
+   - Choose **Auto Mining** or **Schematic Printing** in the Area & Control tab.
+   - For mining: define the digging area by typing coordinates, clicking **Corner 1 / 2 = Feet**, **Mainhand Detect**, or **Read Litematica (`读取投影`)**, and set your `Min Y` / `Max Y`.
+   - Adjust strategy, liquid policy, bubble-column escape mode, sealing/scaffold blocks, foods, and feature toggles as needed, then click **Save & Close**.
+4. **Tap `F9`** (or run `/perimeterdig start`) to start automated clearing or schematic building.
+5. **Tap `F9`** again to pause/resume, or press **`Esc`** (with no GUI open) / run `/perimeterdig stop` to stop.
 
-### Excavate a regular rectangular XZ area specified by command
+---
+
+## In-Game Configuration GUI (`F9`)
+
+| Tab | What You Can Configure |
+| --- | --- |
+| **Area & Control (`选区控制`)** | Work mode (`mine` / `build_schematic`), live status readout, Start/Pause/Stop buttons, rectangular corners & `Min Y / Max Y`, Read Litematica, Mining Strategy, Liquid Policy, Durability Recovery Mode, Schematic policies (`wrong_block_policy`, `missing_material_policy`, `optimize_water`, `clear_extra_blocks`), Resource Points & Per-Layer Material Calculator, and **Bubble Escape Mode**. |
+| **Feature Toggles (`功能开关`)** | Drop Collection, Auto Unload, Auto Eat, Tool Durability Protection, Durability Recovery, Cross-Dimension Repair, Auto Resupply, Elytra Navigation, Auto Sleep, 3D Area Overlay, `/fly` Movement, Stall Detection, Auto Swap Backpack Tool, Auto Replace Low-Durability Tool, and **Bubble Escape Mode**. |
+| **Blocks & Items (`方块物品`)** | Sealing Blocks, **Scaffold Blocks** (bridging/pillaring), Allowed Foods (+ Auto Swap Food toggle), Unload Keep Whitelist, Mining Whitelist (skip blocks + toggle), Mining Blacklist (only mine blocks + toggle), each with a one-click `+Mainhand` button. |
+| **Waypoints & Debug (`坐标点位`)** | Named points (Consumable Supply, Durability Supply, Bed, Overworld/Nether Portals, Furnace Row Start/End), multi-unloading-point management, and single-flow debug triggers (Unload, Supply, Repair, Sleep). |
+| **Advanced (`数值参数`)** | 6 sub-pages covering all 32 `AdvancedConfig` numeric parameters (durability thresholds, food/health thresholds, stall detection timeouts, drop collection, navigation/portal/repair timeouts, etc.). |
+
+---
+
+## Command Reference
+
+All commands live under `/perimeterdig`:
 
 ```text
+# Lifecycle & Status
+/perimeterdig start
+/perimeterdig pause
+/perimeterdig resume
+/perimeterdig stop
+/perimeterdig reload
+/perimeterdig status [clear | history [all | clear]]
+
+# Area Selection
+/perimeterdig plan litematica
 /perimeterdig plan rectangle <x0> <z0> <x1> <z1> <minY> <maxY>
-/perimeterdig start
+/perimeterdig detect <block>
+
+# Core Configuration
+/perimeterdig config show
+/perimeterdig config clear detected_area
+/perimeterdig config set digging_min_y <y>
+/perimeterdig config set digging_max_y <y>
+/perimeterdig config set liquid_policy <seal_boundary|replace|avoid>
+/perimeterdig config set mining_strategy <global_top_down|local_top_down|chunk_top_down>
+/perimeterdig config set durability_recovery_mode <repair_portal|supply_point|furnace_row>
+/perimeterdig config set work_mode <mine|build_schematic>
+/perimeterdig config set wrong_block_policy <skip|break_and_place>
+/perimeterdig config set missing_material_policy <place_available|pause_immediately>
+/perimeterdig config set clear_extra_blocks <true|false>
+/perimeterdig config set optimize_water <true|false>
+/perimeterdig config set bubble_escape_mode <auto|scaffold_first|bucket_first|walk_or_fly>
+/perimeterdig config set unloading_point <name> <x> <minY> <maxY> <z>
+/perimeterdig config set|remove resource_point <name> [<x> <y> <z>]
+
+# Block & Item Lists (add / remove)
+/perimeterdig config add|remove sealing_block <block>
+/perimeterdig config add|remove food <item>
+/perimeterdig config add|remove unloading_whitelist <item>
+/perimeterdig config add|remove mining_whitelist <block>
+/perimeterdig config add|remove mining_blacklist <block>
+
+# Sub-Flow Debug Triggers
+/perimeterdig debug unload
+/perimeterdig debug supply <consumables|durability>
+/perimeterdig debug repair
+/perimeterdig debug sleep
 ```
 
-Both XZ corners and both Y limits are inclusive.
+---
 
-### Excavate an automatically detected irregular XZ area
+## Configuration & Compatibility Notes
 
-1. At one Y level, surround the desired area with one block type.
-2. Stand inside the outer boundary.
-3. Keep the outlined area inside chunks rendered by the client.
-4. Run:
+- **Per-World Config Storage**: World and server configs are stored under `config/perimeter-digger-plus/worlds/` so settings never collide across worlds or with upstream `perimeter-digger`.
+- **Single-Player vs. Multiplayer**: Works on both single-player worlds and multiplayer servers (within vanilla client mechanics and server permissions such as `/fly`). Through-wall liquid sealing uses synthesized face clicks within 4.5-block reach; if a strict anti-cheat server rejects it, switch liquid policy to `avoid` or seal boundaries manually.
+- **Litematica Compatibility**: Optional soft dependency via reflection, verified against `litematica-fabric-26.2-0.28.8` and `litematica-printer-26.2-3.2.2`. If Litematica is absent, the mod runs normally and informs you only if you click Read Litematica or start schematic building.
+
+---
+
+## Optional Local Agent HTTP API
+
+Disabled by default for security. When explicitly enabled via either:
+- creating an empty marker file `config/perimeter-digger-plus/agent-api/enabled`, or
+- launching with `-Dperimeterdig.api.enabled=true`
+
+the mod binds a loopback-only (`127.0.0.1:18769`) Bearer-token-authenticated HTTP API (`config/perimeter-digger-plus/agent-api/connection.json`) for external automation/monitoring. See [`agent/`](agent/) for the reference Node.js client (`client.mjs`) and source-contract tests (`client.test.mjs`).
+
+---
+
+## Building & Testing from Source
+
+### 1. Node.js Source-Contract Tests (Node.js 18+, No Minecraft Required)
+```bash
+node --test agent/client.test.mjs
+```
+
+### 2. Local Windows Build, Unit Tests & Install (JDK 25 + Local Fabric 26.2 Instance)
+```powershell
+# Build embedded Baritone fork + single Jar-in-Jar mod artifact
+powershell -ExecutionPolicy Bypass -File scripts/build-local.ps1 -MinecraftDir "<path-to-.minecraft>"
+
+# Run Node contract tests + Baritone JUnit + Perimeter Digger Plus JUnit
+powershell -ExecutionPolicy Bypass -File scripts/test-local.ps1 -MinecraftDir "<path-to-.minecraft>"
+
+# Install single JAR into mods/ (automatically disables older Perimeter/Baritone JARs)
+powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1 -ModsDir "<path-to-mods>"
+```
+
+---
+
+## Repository Layout
 
 ```text
-/perimeterdig detect <boundaryBlock> <boundaryY>
-/perimeterdig config set digging_min_y <Y>
-/perimeterdig config set digging_max_y <Y>
-/perimeterdig start
+Perimeter-Digger-Plus/
+├── src/                # Main, client, and JUnit test sources (modid: perimeter-digger-plus)
+├── baritone/           # Bundled customized Baritone fork (LGPL-3.0)
+├── printer-patch/      # Optional source patch for litematica-printer-26.2-3.2.2
+├── agent/              # Optional local HTTP API Node.js client & contract tests
+├── scripts/            # Portable PowerShell build, test, and install scripts
+├── .github/workflows/  # CI workflow
+├── build.gradle        # Fabric Loom build definition
+├── gradle.properties   # Minecraft / Fabric / Mod version properties
+├── README.md           # English documentation (Primary)
+├── README.zh-CN.md     # Simplified Chinese documentation
+└── LICENSE             # GPL-3.0-or-later
 ```
 
-Example:
+---
 
-```text
-/perimeterdig detect minecraft:red_wool 80
-/perimeterdig config set digging_min_y -59
-/perimeterdig config set digging_max_y 79
-/perimeterdig start
-```
+## Roadmap
 
-Cardinally or diagonally touching boundary blocks belong to the same component. The outer boundary columns are excluded. With nested rings, the next interior is excluded while that ring's block columns remain mineable; further nesting alternates by parity.
+- [x] Minecraft 26.2 + Fabric Loader 0.20.1+ all-in-one Jar-in-Jar release
+- [x] Full `F9` 5-tab GUI, 3D selection overlay, Litematica footprint import, `/fly` mining, scaffold/sealing separation & anti-stall hardening
+- [x] Layer-by-layer schematic printing, optimized water source placement, shulker/chest resupply & downward bubble-column escape strategies
+- [ ] Support additional Minecraft versions
+- [ ] Support additional mod loaders (NeoForge / Forge)
+- [ ] Expanded English/localized UI strings alongside Chinese labels
 
-Detection has no configured size limit, but only chunks loaded within the client's render distance can be inspected.
+---
 
-## Commands
+## License & Attribution
 
-### Runtime and status
-
-| Command | Description |
-| --- | --- |
-| `/perimeterdig` | Show the current state and detail. |
-| `/perimeterdig start` | Validate the area and start automation. Missing optional facilities only disable their related actions. |
-| `/perimeterdig stop` | Stop automation and release Baritone input. |
-| `/perimeterdig pause` | Pause active mining. |
-| `/perimeterdig resume` | Resume paused mining. |
-| `/perimeterdig status` | Show the current state, detail, target, and retry count. |
-| `/perimeterdig status clear` | Stop and clear cached runtime state without deleting configuration. |
-| `/perimeterdig status history` | Show the 16 newest state transitions. |
-| `/perimeterdig status history all` | Show up to 64 state transitions. |
-| `/perimeterdig status history clear` | Clear transition history. |
-| `/perimeterdig reload` | Reload the current world's configuration and reset runtime state. |
-
-### Area and base configuration
-
-| Command | Description |
-| --- | --- |
-| `/perimeterdig detect <block> <Y>` | Detect an enclosed irregular area. |
-| `/perimeterdig plan rectangle <x0> <z0> <x1> <z1> <minY> <maxY>` | Create an inclusive rectangle and Y range. |
-| `/perimeterdig config` | Show the current configuration. |
-| `/perimeterdig config show` | Show the current configuration. |
-| `/perimeterdig config clear detected_area` | Delete the saved area. |
-| `/perimeterdig config set digging_min_y <Y>` | Set the inclusive minimum mining Y. |
-| `/perimeterdig config set digging_max_y <Y>` | Set the inclusive maximum mining Y. |
-
-### Facility points
-
-Every point uses the block coordinate `<x> <y> <z>`:
-
-```text
-/perimeterdig config set consumable_supply_point <x> <y> <z>
-/perimeterdig config set durability_supply_point <x> <y> <z>
-/perimeterdig config set bed_point <x> <y> <z>
-/perimeterdig config set perimeter_portal_overworld <x> <y> <z>
-/perimeterdig config set perimeter_portal_nether <x> <y> <z>
-/perimeterdig config set repair_portal_overworld <x> <y> <z>
-/perimeterdig config set repair_portal_nether <x> <y> <z>
-/perimeterdig config set furnace_row_start <x> <y> <z>
-/perimeterdig config set furnace_row_end <x> <y> <z>
-```
-
-Supply points are chest block coordinates. The bed point is the bed block. The furnace row must be axis-aligned; only its first and last furnace positions are stored. Navigation selects a nearby standing position for beds, supply chests, and furnaces, and approaches within a 3-block eye-to-block-center distance before interacting.
-
-All facilities are optional during normal mining. A missing point or route suppresses only the related automatic action. Debug commands still require the facility they test.
-
-### Unloading points
-
-```text
-/perimeterdig config set unloading_point <name> <x> <minY> <z>
-/perimeterdig config remove unloading_point <name>
-/perimeterdig config add unloading_whitelist <item>
-/perimeterdig config remove unloading_whitelist <item>
-```
-
-An unloading point represents a vertical shaft at its XZ coordinate; Y is the shaft's minimum Y. Multiple named shafts are supported. The mod chooses a nearby safe standing block with minimum XZ distance, prefers a Y near the player's current Y, moves to the edge with a 0.2-block inset, sneaks, faces the configured shaft center, and drops disposable items.
-
-Damageable items, tools, equippable items, Elytra, fireworks, configured food, and whitelisted items are retained. Other inventory items are treated as mining products.
-
-### Fluid handling
-
-```text
-/perimeterdig config set liquid_policy avoid
-/perimeterdig config set liquid_policy replace
-/perimeterdig config set liquid_policy seal_boundary
-/perimeterdig config add sealing_block <block>
-/perimeterdig config remove sealing_block <block>
-```
-
-The default policy is `seal_boundary`. The default sealing block is `minecraft:netherrack`. Mining may start with an empty sealing-block list.
-
-### Food and durability
-
-```text
-/perimeterdig config add food <item>
-/perimeterdig config remove food <item>
-/perimeterdig config set durability_recovery_mode repair_portal
-/perimeterdig config set durability_recovery_mode supply_point
-```
-
-The default food is `minecraft:enchanted_golden_apple`.
-
-- `repair_portal`: travel through the mining-area and XP-furnace portal pairs, then use XP furnaces to repair Mending tools and Elytra.
-- `supply_point`: put low-durability tools and Elytra into the supply chest, take higher-durability replacements, and equip them automatically.
-
-A higher-durability matching replacement already in the inventory is always preferred before either remote strategy.
-
-### Function switches
-
-```text
-/perimeterdig function
-/perimeterdig function enable <function>
-/perimeterdig function disable <function>
-```
-
-Available functions:
-
-| Function | Default | Effect when disabled |
-| --- | --- | --- |
-| `collect_drops` | `true` | Skip the post-batch collection phase. A full inventory may still trigger unloading. |
-| `unload` | `true` | Do not automatically unload. |
-| `eat` | `true` | Do not automatically eat. |
-| `durability_recovery` | `true` | Do not travel to a supply point or XP furnaces. Local higher-durability replacement remains enabled. |
-| `cross_dimension_repair` | `true` | Travel directly to the XP furnaces in the current dimension instead of using cross-dimensional portals. |
-| `resupply` | `true` | Do not replenish food or fireworks. |
-| `elytra_navigation` | `true` | Disable Elytra navigation, firework-triggered resupply, and Elytra durability replacement or recovery. Tool durability handling remains active. |
-| `sleep` | `false` | Do not sleep automatically at night. |
-
-### Advanced configuration
-
-```text
-/perimeterdig config_advanced
-/perimeterdig config_advanced show
-/perimeterdig config_advanced set <key> <value>
-```
-
-| Group | Keys and defaults |
-| --- | --- |
-| Durability | `tool_durability_threshold=32`, `elytra_durability_threshold=32`, `emergency_flight_durability_threshold=5` |
-| Consumables | `food_level_threshold=14`, `health_eating_threshold=16`, `food_resupply_trigger=1`, `food_resupply_target=64`, `firework_resupply_trigger=10`, `firework_resupply_target=128` |
-| Mining and unloading | `drop_collection_radius=8`, `drop_collection_stable_seconds=1.5`, `inventory_reserved_slots=1`, `mining_blocks_per_empty_slot=64`, `unload_landing_search_radius=16`, `unload_edge_inset=0.2` |
-| Navigation | `elytra_navigation_min_distance=32`, `navigation_stall_timeout_seconds=10`, `navigation_retry_count=2`, `flight_retry_count=2`, `portal_transition_cost=16`, `portal_transition_timeout_seconds=20` |
-| Portal exit | `portal_exit_timeout_seconds=20`, `portal_exit_min_radius=3`, `portal_exit_max_radius=8`, `portal_exit_vertical_radius=4` |
-| Interaction | `repair_experience_stable_seconds=1.5`, `supply_interaction_timeout_seconds=2`, `furnace_interaction_timeout_seconds=2` |
-
-Values are range-checked, and related minimum/maximum and trigger/target values are validated together.
-Keys and current values support basic Tab completion.
-
-### Debug flows
-
-| Command | Description |
-| --- | --- |
-| `/perimeterdig debug unload` | Run the unloading flow. |
-| `/perimeterdig debug supply consumables` | Test taking items from the consumable supply chest. |
-| `/perimeterdig debug supply durability` | Test replacement at the tool/Elytra supply point. |
-| `/perimeterdig debug repair` | Test the XP-furnace repair flow. |
-| `/perimeterdig debug sleep` | Test automatic sleeping. |
-
-## Automation behavior
-
-The default batch limit is `(empty main-inventory slots - 1) * 64`. If only one slot is empty, the limit is one block. The offhand is ignored when deciding whether the inventory is full.
-
-After each batch, drops within an 8-block horizontal radius are collected until the inventory item count has not increased for about 1.5 seconds. After unloading, the mod returns to the recorded mining departure point before continuing.
-
-Automatic eating starts when food level is 14 or lower, or when health is 16 or lower while hunger is not full. Food is replenished at a total count of 1 or lower to a target of 64. Fireworks are replenished at 10 or fewer to a target of 128. Consumable supply has priority over remote durability recovery.
-
-All damageable tools in the main inventory and offhand are monitored. Equipped or carried Elytra are monitored only while `elytra_navigation` is enabled. At 32 remaining durability or lower, the mod first tries a higher-durability local replacement and then follows the configured recovery strategy. Emergency travel may continue with an Elytra above 5 remaining durability.
-
-During XP-furnace repair, outputs are collected one at a time. The mod switches repair targets while experience is still being absorbed, advances to the next furnace after durability growth stops, and returns as soon as every target is fully repaired. Furnace navigation tries nearby unobstructed interaction-range stands individually and reports both the furnace and last attempted stand only after all candidates fail. With `cross_dimension_repair` disabled, only the XP-furnace coordinates are required and are interpreted in the current dimension; the trip does not use portals in either direction.
-
-Baritone sprinting and parkour are always enabled.
-
-Placement is disabled at every non-mining destination. Breaking is enabled while navigating to mining-area portals, but both breaking and placement are disabled during the rest of a repair trip outside the mining area.
-
-Walking is attempted first where appropriate. Elytra is used for distant destinations or destinations that cannot be reached by walking directly upward. The navigation watchdog retries stalled routes before reporting an error.
-
-## Configuration and localization
-
-World-specific JSON files are stored under:
-
-```text
-config/perimeter-digger/worlds/<world-id>.json
-```
-
-Each server address and single-player save gets a separate file. Configuration is schema-versioned; old unversioned files are migrated automatically, while files from an unsupported newer schema are rejected. Runtime task progress is not checkpointed, and disconnect/reconnect task recovery is not implemented.
-
-Language resources are stored in `assets/perimeter-digger/lang/en_us.json` and `zh_cn.json`. State history stores translation keys and arguments, so it is rendered in the currently selected client language. Build tests require both language files to have the same ordered keys and compatible placeholders.
-
-## Building
-
-Building requires the modified Baritone API JAR; an unmodified Baritone release does not provide the APIs used by this mod. The currently compatible published dependency is [Baritone Fabric 26.1.1 hr.1](https://github.com/HackerRouter/baritone/releases/tag/v26.1.1-hr.1).
-
-When `baritone_jar` is not specified, Gradle uses the local development path configured in `build.gradle`. To build without a neighboring Baritone source repository, pass the released JAR explicitly.
-
-Windows:
-
-```text
-gradlew.bat clean build -Pbaritone_jar="C:\path\to\baritone-api-fabric-26.1.1-hr.1.jar"
-```
-
-Linux:
-
-```text
-./gradlew clean build -Pbaritone_jar=/path/to/baritone-api-fabric-26.1.1-hr.1.jar
-```
-
-The repository workflow downloads this pinned Baritone release, verifies its SHA-256 checksum, and passes it through `baritone_jar` automatically.
-
-The mod JAR is written to `build/libs/`.
-
-## License
-
-Copyright (C) 2026 HackerRouter.
-
-Perimeter Digger is free software licensed under the [GNU General Public License v3.0 or later](LICENSE) (`GPL-3.0-or-later`). You may redistribute and modify it under those terms. It is provided without any warranty, including the implied warranties of merchantability or fitness for a particular purpose.
-
-Unless explicitly stated otherwise, contributions submitted to this repository are licensed under `GPL-3.0-or-later`.
-
-The modified Baritone and Nether Pathfinder projects remain subject to the licenses and notices in their respective repositories. Their names and links identify dependencies and do not imply that their code is relicensed by this project.
-
-Java source files receive the project license header automatically during compilation. Run `./gradlew licenseFormat` (or `gradlew.bat licenseFormat` on Windows) to apply it explicitly.
+- **Perimeter Digger Plus** is licensed under the **GNU General Public License v3.0 or later** — see [`LICENSE`](LICENSE).
+- Upstream project: [HackerRouter/Perimeter-Digger](https://github.com/HackerRouter/Perimeter-Digger) (`Copyright (C) 2026 HackerRouter`, GPL-3.0-or-later).
+- The bundled customized Baritone fork in [`baritone/`](baritone/) is licensed under the **GNU Lesser General Public License v3.0** — see [`baritone/LICENSE`](baritone/LICENSE), derived from [cabaletta/baritone](https://github.com/cabaletta/baritone) and [HackerRouter/baritone](https://github.com/HackerRouter/baritone).
+- The optional compatibility patch in [`printer-patch/`](printer-patch/) (and `litematica-printer-26.2-3.2.2-patched.jar`) is modified from [aleksilassila/litematica-printer](https://github.com/aleksilassila/litematica-printer) (original license: **CC0-1.0**).

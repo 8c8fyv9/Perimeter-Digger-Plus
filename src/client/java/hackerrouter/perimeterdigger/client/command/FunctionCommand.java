@@ -44,7 +44,7 @@ import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 final class FunctionCommand {
 	private static final List<String> KEYS = List.of(
-			"collect_drops", "unload", "eat", "durability_recovery", "cross_dimension_repair", "resupply", "elytra_navigation", "sleep"
+			"collect_drops", "unload", "eat", "durability_protection", "durability_recovery", "cross_dimension_repair", "resupply", "elytra_navigation", "sleep", "render_area", "flight_movement", "mining_whitelist", "mining_blacklist", "auto_swap_backpack_tool", "auto_replace_low_durability_tool", "auto_swap_backpack_food"
 	);
 	private final WorldConfigManager configs;
 	private final AutomationController controller;
@@ -73,11 +73,19 @@ final class FunctionCommand {
 				case "collect_drops" -> functions.collectDrops = enabled;
 				case "unload" -> functions.unload = enabled;
 				case "eat" -> functions.eat = enabled;
+				case "durability_protection" -> functions.durabilityProtection = enabled;
 				case "durability_recovery" -> functions.durabilityRecovery = enabled;
 				case "cross_dimension_repair" -> functions.crossDimensionRepair = enabled;
 				case "resupply" -> functions.resupply = enabled;
 				case "elytra_navigation" -> functions.elytraNavigation = enabled;
 				case "sleep" -> functions.sleep = enabled;
+				case "render_area" -> functions.renderArea = enabled;
+				case "flight_movement" -> functions.flightMovement = enabled;
+				case "mining_whitelist" -> functions.miningWhitelist = enabled;
+				case "mining_blacklist" -> functions.miningBlacklist = enabled;
+				case "auto_swap_backpack_tool" -> functions.autoSwapBackpackTool = enabled;
+				case "auto_replace_low_durability_tool" -> functions.autoReplaceLowDurabilityTool = enabled;
+				case "auto_swap_backpack_food" -> functions.autoSwapBackpackFood = enabled;
 				default -> throw new IllegalArgumentException("Unknown function: " + key + ".");
 			}
 			configs.save();
@@ -100,11 +108,19 @@ final class FunctionCommand {
 					.append(field(Translations.COMMAND.tr("function.collect_drops"), functions.collectDrops)).append(separator())
 					.append(field(Translations.COMMAND.tr("function.unload"), functions.unload)).append(separator())
 					.append(field(Translations.COMMAND.tr("function.eat"), functions.eat)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.durability_protection"), functions.durabilityProtection)).append(separator())
 					.append(field(Translations.COMMAND.tr("function.durability_recovery"), functions.durabilityRecovery)).append(separator())
 					.append(field(Translations.COMMAND.tr("function.cross_dimension_repair"), functions.crossDimensionRepair)).append(separator())
 					.append(field(Translations.COMMAND.tr("function.resupply"), functions.resupply)).append(separator())
 					.append(field(Translations.COMMAND.tr("function.elytra_navigation"), functions.elytraNavigation)).append(separator())
-					.append(field(Translations.COMMAND.tr("function.sleep"), functions.sleep))
+					.append(field(Translations.COMMAND.tr("function.sleep"), functions.sleep)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.render_area"), functions.renderArea)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.flight_movement"), functions.flightMovement)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.mining_whitelist"), functions.miningWhitelist)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.mining_blacklist"), functions.miningBlacklist)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.auto_swap_backpack_tool"), functions.autoSwapBackpackTool)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.auto_replace_low_durability_tool"), functions.autoReplaceLowDurabilityTool)).append(separator())
+					.append(field(Translations.COMMAND.tr("function.auto_swap_backpack_food"), functions.autoSwapBackpackFood))
 					.append(Component.literal(".").withStyle(ChatFormatting.GRAY)));
 			return 1;
 		} catch (RuntimeException exception) {

@@ -1,308 +1,249 @@
-# Perimeter Digger
+# Perimeter Digger Plus（空置域自动挖掘与投影建造增强版）
 
-[English](README.md)
+[English](README.md) | **简体中文**
 
-Perimeter Digger 是一个 基于魔改版 Baritone 自动挖掘大型区域内方块的 26.1.1 Fabric Mod。
+[![Minecraft](https://img.shields.io/badge/Minecraft-26.2-52A535?logo=minecraft&logoColor=white)](https://minecraft.net)
+[![Mod Loader](https://img.shields.io/badge/Loader-Fabric%200.20.1%2B-DBD0B4)](https://fabricmc.net)
+[![Java](https://img.shields.io/badge/Java-25%2B-ED8B00)](https://adoptium.net)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE)
 
-------
+基于 [HackerRouter/Perimeter-Digger](https://github.com/HackerRouter/Perimeter-Digger) 二次开发的 Minecraft 客户端**自动区域挖掘与逐层投影建造**模组增强版：单包整合自定义 Baritone（Jar-in-Jar），提供全功能 `F9` 图形配置界面、3D 半透明选区渲染、Litematica 投影占地一键读取与逐层自动打印、智能水体优化放置、向下气泡柱寻路规避与 4 种可配置脱困策略、`/fly` 3D 飞行挖掘、三种自顶向下挖掘策略、背包自动换工具/低耐久替换/自动换食/潜影盒补料、最底层防挖穿保护，以及全方位防卡死与受击反击加固。
 
-### 前置 MOD：
-### [魔改版 Baritone](https://github.com/HackerRouter/baritone/releases)
+> **当前支持版本：** Minecraft `26.2` · Fabric Loader `0.20.1+` · Fabric API · Java `25+`  
+> **Mod ID：** `perimeter-digger-plus`（独立配置目录 `config/perimeter-digger-plus/`，已声明 `breaks: perimeter-digger` 防止与原版冲突共存）。
 
-### Perimeter Digger 使用教程视频: [BV1yFK56cESA](https://www.bilibili.com/video/BV1yFK56cESA)
+---
 
-------
+## 目录
 
-它支持：
-- 不规则 XZ 平面区域挖掘
-- 挖掘区域边缘的流体封堵，内部的流体处理
-- 自动收集掉落物
-- 自动前往最近卸货点丢出挖掘产物
-- 自动前往补给点补充消耗品（烟花+食物）
-- 自动前往补给点补充替换低耐久工具/鞘翅
-- 自动跨维度前往经验熔炉点修补工具/鞘翅
-- 自动睡觉
-- 步行+鞘翅寻路
+- [核心特性与增强](#核心特性与增强)
+- [安装与快速上手](#安装与快速上手)
+- [`F9` 图形配置界面说明](#f9-图形配置界面说明)
+- [常用命令参考](#常用命令参考)
+- [配置与兼容性说明](#配置与兼容性说明)
+- [可选本地 Agent HTTP 接口](#可选本地-agent-http-接口)
+- [从源码构建与测试](#从源码构建与测试)
+- [仓库目录结构](#仓库目录结构)
+- [开发路线图](#开发路线图)
+- [开源协议与致谢](#开源协议与致谢)
 
-## 运行要求
+---
 
-- Minecraft 26.1.1
-- \>= Fabric Loader 0.19.3
-- Fabric API
-- Java 25 或更高版本
-- **[魔改版 Baritone](https://github.com/HackerRouter/baritone/releases)**
+## 核心特性与增强
 
-原版 Baritone 不具备 自定义 XZ 平面区域挖掘 和 鞘翅/寻路 API 扩展。
+### 单包分发与交互体验
+- **单包整合（Jar-in-Jar）**：内置随仓维护的修改版 [`baritone/`](baritone/)，只需放一个 JAR 到 `mods/` 目录即可使用，无需单独下载 Baritone。
+- **全功能 `F9` 五标签图形配置界面**：
+  - **短按 `F9`**：一键开始 / 暂停 / 恢复任务（`Esc` 仅在没有打开界面时停止自动化）。
+  - **长按 `F9`（约 400ms）**：打开完整图形设置界面，无需手改 JSON 或背诵命令。
+- **Litematica 投影占地一键导入**：
+  - 在 `F9`「选区控制」页点击 **「读取投影」** 或执行 `/perimeterdig plan litematica`。
+  - 零硬依赖反射接入（未安装投影模组也能正常运行）：优先读取当前选中投影，其次距玩家最近的已启用投影，自动合并多子区域旋转/镜像后的真实世界占地并校验世界高度；未安装投影、无已放置投影或数据不兼容时给出明确提示。
+- **3D 半透明选区渲染**：基于原生 Fabric `LevelRenderEvents.COLLECT_SUBMITS` 与 `DrawableGizmoPrimitives`，支持矩形与探界多边形，按维度隔离显示，修改范围即时更新。
 
-## 安装
+### 逐层自动放置投影（`模式: 投影打印`）
+- **逐层自动建造**（零硬依赖反射联动 Litematica 与 `litematica-printer`）：
+  - 在 `F9`「选区控制」页一键切换「自动挖掘 / 投影打印」。
+  - 自底向上逐层切换 Litematica 单层显示并统计本层所需方块与背包缺口（可切换「先放已有材料再暂停」或「缺料立刻暂停」）；内置三视图材料计算器（当前目标层 / 所有未完成层 / 总体材料），支持箱子、木桶、已放置潜影盒与随身潜影盒递归盘点并计算可建层数。
+  - 提供「跳过」与「破坏并重放（可选连带清理空气处多余块）」两种错误方块处理方式，配合 `lastAnchorPos` 连续局部性锚点防止平行墙体乒乓折返，并在停止/暂停/完成后自动还原原有 `LayerRange` 与 `PRINT_MODE`。
+- **多资源点自动补料与潜影盒拆收（`SchematicResourceController`）**：
+  - 缺料、缺水桶、食物低于阈值、破坏重放缺健康工具或搭路块不足时，自动前往配置箱子/潜影盒取料，或在安全地面自动临时放置、拆取并挖回随身潜影盒。
+- **精准告示牌放置（`SchematicSignPlacer`）**：
+  - 支持立牌 16 方向、墙牌 4 方向与悬挂告示牌的精确朝向/潜行同步与自动关闭编辑框。
+- **智能水体优化放置（`WaterSourceOptimizer` + `SchematicWaterPlacer`）**：
+  - 每层实体方块放完后，自动接管含水方块（`waterlogged=true`）与满格水源放置；利用原版双邻格无限水转化机制，规则矩形水域严格达到 $\lceil (W + L) / 2 \rceil$ 理论最优下界（如 10×10 仅需 10 次倒水、20×40 仅需 30 次），不规则/带柱子水域采用前瞻闭包贪心与冗余剪枝。
+  - 生存模式自动合并散落空桶并从就近安全可再生水源续桶（随身带 2 桶水即可铺满任意大水池），结合内墙侧视线阈值与 5 射线抖动防外溢校验；若服务端关闭无限水规则，核验后自动回退为逐格补水。
+- **可选 `litematica-printer` 26.2-3.2.2 兼容性补丁（`printer-patch/`）**：
+  - 修复上游打印机在开启 `printInAir=true` 或复杂结构下的 5 类错放：半砖（上/下/双半砖）、红石火把/普通火把（`BaseTorchBlock` 全接管）、栅栏/栅栏门/石墙（中心命中与同 tick 原子执行）、告示牌（立/墙/悬挂与牌贴牌）、原木轴向保护与防误剥皮/误倒水。
 
-1. 为 Minecraft 26.1.1 安装 Fabric Loader。
-2. 将 Fabric API、最新的 [魔改版 Baritone](https://github.com/HackerRouter/baritone/releases) 和 [Perimeter Digger](https://github.com/HackerRouter/Perimeter-Digger/releases) 放入客户端的 `mods` 目录。
+### 双引擎挖掘与策略切换
+- **三种可切换自顶向下策略**（地面 Baritone 与 `/fly` 飞行引擎统一支持）：
+  - `global_top_down`（整体顶部）：严格优先清空整个选区当前最高层。
+  - `local_top_down`（局部顶部）：优先把附近高台/塔状结构自顶向下清平，再切往下一片区域。
+  - `chunk_top_down`（单区块）：按距玩家由近到远，逐区块自顶向下清完。
+- **`/fly` 3D 飞行导航与挖掘**：
+  - 开启飞行移动且角色拥有 `mayfly` 权限时自动启用 3D 悬停挖掘，避开复杂地形与水体寻路。
+  - 顶棚/树冠角落自动探测开阔方向并持续降高绕障；飞行受阻时自动就地挖掘前方/头顶选区内的可挖方块开路。
+- **方块白名单 / 黑名单 + 封闭口袋检测**：
+  - 支持默认关闭的「不挖方块白名单」（保护方块）与「只挖方块黑名单」（仅挖指定方块），同步约束 Baritone 寻路并结合有界 3D 逆向 BFS（`SealedPocketDetector`）自动跳过被保护块完全包裹的不可达区域。
 
-所有指令均为客户端指令，支持基础的 Tab 补全。
-界面翻译自动跟随 游戏当前选择的语言，目前仅包含英文和简体中文。
+### 向下气泡柱寻路脱困与安全加固
+- **向下气泡柱（`BUBBLE_COLUMN[drag=true]`）寻路感知与 4 种可配置脱困策略（`BubbleColumnEscapeController`）**：
+  - Baritone 寻路层（`MovementHelper`、`MovementPillar`、`MovementAscend`、`MovementTraverse`、`MovementDescend`）原生识别向下气泡柱下拽物理：禁止将向下气泡柱上方悬浮格当作可站立/游泳平面，禁止在柱内规划水中上浮或原地起跳垫脚，高代价规避主动走入/落入，仅允许沿岩浆块底板自动潜行免伤通行或跨上 `<=0.5` 高下半砖台阶。
+  - 在 `F9` 界面或通过 `/perimeterdig config set bubble_escape_mode <模式>` 可切换 4 种脱困策略：
+    - `auto`（默认：`自动综合`）：`/fly` 上浮 → 原地放零碰撞块（脚手架/铁轨/告示牌/梯子）或邻格放下半砖/活板门封住岩浆块（5 tick 自动转为普通水并无需起跳直接跨上上浮）→ 安全空桶舀断气泡柱并起跳垫高 → 保持潜行横向走出。
+    - `scaffold_first`（`垫块封泡`）：优先放零碰撞块或下半砖/活板门封住底板岩浆块转普通水上浮。
+    - `bucket_first`（`空桶断流`）：优先用安全空水桶舀断脚下气泡柱并起跳垫高。
+    - `walk_or_fly`（`潜行/飞行`）：绝不临时放块或舀水，仅靠 `/fly` 或保持潜行免伤横向走出。
+- **智能背包工具与食物管理**：
+  - 挖掘时自动从背包将最合适工具换入物品栏空槽/杂物槽（`autoSwapBackpackTool`），低耐久自动原地换入背包高耐久替代工具（`autoReplaceLowDurabilityTool`），并提供独立「工具耐久保护」开关。
+  - 饥饿或低血需要进食时自动将背包允许食物安全换入物品栏（`autoSwapBackpackFood`），不顶掉工具与封堵块，吃光一组中途自动续补，借用关键槽吃完自动归位。
+- **独立「搭路方块」与「填水/封堵方块」配置**：
+  - 在 `F9`「方块物品」页可分别配置填水/封堵方块与寻路搭路方块（同步至 Baritone `acceptableThrowawayItems`）；搭路方块留空时自动沿用默认（圆石/泥土/石头）+ 封堵方块，填写后严格只用指定搭路方块，不再误消耗地狱岩等填水材料。
+- **最底层 `minY - 1` 防挖穿与脚手架防自挖保护**：
+  - 在 A\* 寻路代价（`breakCostMultiplierAt`）与执行层（`BlockBreakHelper`）双重拦截 `y < diggingMinY`；通过 `ScaffoldTracker` 保护攀爬/搭桥中的临时脚手架并在完工后自动清净。
+- **防原地折返、防 A↔B 乒乓与受击反击加固**：
+  - 区域挖掘使用 `REVALIDATE_GOAL_AND_PATH`、顽固目标递增冷却（`45 秒 → 180 秒 → 本周期跳过`）+ `StuckCellPenalty`、有界跨区赶路宽限。
+  - 受击反击时每 tick 强制关闭打开的箱子/潜影盒/背包/设置等 GUI 界面并重切剑/斧头反击，不可达怪快速脱战，低血进食先吃完本口再反击。
 
-## 主要功能
+---
 
-- 根据同一Y高度的指定边界方块，探测需要挖掘的不规则封闭 XZ 区域。
-- 直接通过坐标规划（包含坐标）需要挖掘的的矩形 XZ 区域。
-- 在指定的 Y高度 范围内挖掘所选列。
-- 使用可配置方块避开、替换或封堵流体。
-- 按剩余物品栏容量进行挖掘，收集附近掉落物。
-- 物品栏满后，前往最近的竖直卸货通道，丢弃挖掘产物。
-- 监视工具+鞘翅耐久。
-- 自动替换低耐久工具，也可自动前往补给处/经验熔炉（默认支持跨维度）进行替换/修复。
-- 自动进食、补充食物+烟花，并可选择在夜间自动睡觉。
-- 步行+鞘翅寻路。
-- 按服务器或单人存档分别保存配置。
+## 安装与快速上手
 
-## 快速开始
+### 环境要求
+- Minecraft **26.2**
+- **Fabric Loader 0.20.1+** 与 **Fabric API**
+- **Java 25+**
+- *（可选）* **Litematica**（与 `litematica-printer`，用于一键读取投影或逐层自动建造；若需搭配 `printInAir=true` 建造半砖/红石火把/栅栏/告示牌/剥皮原木，建议使用基于 `printer-patch/` 构建的补丁版）
 
-### 挖掘 指令指定的 规则XZ平面 矩形区域
+### 使用步骤
+1. 将 `perimeter-digger-plus-<version>.jar` 放入 `.minecraft/mods/` 目录。
+   > **注意：** **不要**同时安装独立版 Baritone JAR 或上游原版 `perimeter-digger`，本模组已内置自定义 Baritone。
+2. 启动游戏并进入世界。
+3. **长按 `F9`**（约 400ms）打开图形配置界面：
+   - 在「选区控制」页切换「自动挖掘 / 投影打印」。
+   - 自动挖掘模式下，填写角点或点击「角点 1/2=脚下」「主手探界」或 **「读取投影」** 一键导入 Litematica 投影占地，设置最小/最大 Y 高度。
+   - 按需调整挖掘策略、液体策略、气泡脱困模式、填水/搭路方块、允许食物及各项开关，点击 **「保存并关闭」**。
+4. **短按 `F9`**（或执行 `/perimeterdig start`）开始自动挖掘或投影建造。
+5. 再次 **短按 `F9`** 可暂停/恢复；无打开界面时按 **`Esc`** 或执行 `/perimeterdig stop` 可停止任务。
+
+---
+
+## `F9` 图形配置界面说明
+
+| 标签页 | 可配置内容 |
+| --- | --- |
+| **选区控制** | 模式切换（自动挖掘 / 投影打印）、实时状态显示、开始/暂停/停止按钮、矩形角点与 `最小Y/最大Y`、读取投影、挖掘/液体/修复策略、投影错块/缺料策略、水体优化、清理多余块、资源点设置、逐层物品计算器与**气泡脱困模式**。 |
+| **功能开关** | 掉落收集、自动卸货、自动进食、工具耐久保护、耐久恢复、跨维度维修、自动补给、鞘翅导航、自动睡觉、3D 选区渲染、`/fly` 飞行移动、停滞脱困、背包自动换工具、低耐久自动替换工具与**气泡脱困模式**。 |
+| **方块物品** | 填水/封堵方块、**搭路方块**（寻路垫高/搭桥）、允许食物（含自动换食开关）、卸货保留白名单、不挖方块白名单（含开关）、只挖方块黑名单（含开关），每项均带 `+主手` 快捷录入按钮。 |
+| **坐标点位** | 固定点位管理（补给点、耐久补给点、床、主世界/下界传送门、熔炉排起止点）、多命名卸货点增删改，以及 4 项单流程调试入口（卸货 / 补给 / 维修 / 睡觉）。 |
+| **数值参数** | 共 6 个子页，覆盖全部 32 项 `AdvancedConfig` 高级参数（耐久阈值、饥饿/血量阈值、停滞判定超时、掉落收集、寻路/传送门/维修超时等）。 |
+
+---
+
+## 常用命令参考
+
+所有命令均位于 `/perimeterdig` 下：
 
 ```text
+# 启停与状态
+/perimeterdig start
+/perimeterdig pause
+/perimeterdig resume
+/perimeterdig stop
+/perimeterdig reload
+/perimeterdig status [clear | history [all | clear]]
+
+# 选区设置
+/perimeterdig plan litematica
 /perimeterdig plan rectangle <x0> <z0> <x1> <z1> <minY> <maxY>
-/perimeterdig start
+/perimeterdig detect <block>
+
+# 核心配置
+/perimeterdig config show
+/perimeterdig config clear detected_area
+/perimeterdig config set digging_min_y <y>
+/perimeterdig config set digging_max_y <y>
+/perimeterdig config set liquid_policy <seal_boundary|replace|avoid>
+/perimeterdig config set mining_strategy <global_top_down|local_top_down|chunk_top_down>
+/perimeterdig config set durability_recovery_mode <repair_portal|supply_point|furnace_row>
+/perimeterdig config set work_mode <mine|build_schematic>
+/perimeterdig config set wrong_block_policy <skip|break_and_place>
+/perimeterdig config set missing_material_policy <place_available|pause_immediately>
+/perimeterdig config set clear_extra_blocks <true|false>
+/perimeterdig config set optimize_water <true|false>
+/perimeterdig config set bubble_escape_mode <auto|scaffold_first|bucket_first|walk_or_fly>
+/perimeterdig config set unloading_point <name> <x> <minY> <maxY> <z>
+/perimeterdig config set|remove resource_point <name> [<x> <y> <z>]
+
+# 方块与物品名单（添加 / 移除）
+/perimeterdig config add|remove sealing_block <block>
+/perimeterdig config add|remove food <item>
+/perimeterdig config add|remove unloading_whitelist <item>
+/perimeterdig config add|remove mining_whitelist <block>
+/perimeterdig config add|remove mining_blacklist <block>
+
+# 单流程调试
+/perimeterdig debug unload
+/perimeterdig debug supply <consumables|durability>
+/perimeterdig debug repair
+/perimeterdig debug sleep
 ```
 
-两个 XZ 角点以及 Y 上下限均包含在挖掘范围中。
+---
 
-### 挖掘 自动探测的 不规则XZ平面 区域
+## 配置与兼容性说明
 
-1. 在同一 Y轴高度用一种方块围住所需区域。
-2. 站在外圈内部。
-3. 确保划出的区域位于客户端渲染出的的区块范围内。
-4. 输入：
+- **分世界/分服独立配置**：配置保存在 `config/perimeter-digger-plus/worlds/` 下，不与上游 `perimeter-digger` 冲突，也不跨服串配置。
+- **单人与多人服**：均基于客户端原生交互与服务端允许权限（如 `/fly`）运行。隔墙填水会在 4.5 格交互距离内合成点击面，若遇到极严反作弊服务器拒绝，可改用 `avoid` 液体策略或手动封边。
+- **Litematica 兼容性**：采用无硬依赖反射适配，已核对 `litematica-fabric-26.2-0.28.8` 与 `litematica-printer-26.2-3.2.2`；未安装投影模组时完全不影响正常挖掘使用。
+
+---
+
+## 可选本地 Agent HTTP 接口
+
+出于安全考虑**默认关闭**。仅当用户主动开启以下任一项时，才会在本机回环地址 `127.0.0.1:18769` 启动带 Bearer Token 鉴权的只读/控制接口（连接信息写入 `config/perimeter-digger-plus/agent-api/connection.json`）：
+- 创建空标记文件 `config/perimeter-digger-plus/agent-api/enabled`；或
+- 启动参数加入 `-Dperimeterdig.api.enabled=true`。
+
+配套 Node.js 客户端（`client.mjs`）与源码契约测试（`client.test.mjs`）见 [`agent/`](agent/)。
+
+---
+
+## 从源码构建与测试
+
+### 1. Node.js 源码契约测试（Node.js 18+，无需 Minecraft）
+```bash
+node --test agent/client.test.mjs
+```
+
+### 2. Windows 本地一键构建、测试与安装（JDK 25 + 本地 Fabric 26.2 实例）
+```powershell
+# 编译内置 Baritone 分支并打包单包 Jar-in-Jar
+powershell -ExecutionPolicy Bypass -File scripts/build-local.ps1 -MinecraftDir "<你的.minecraft路径>"
+
+# 运行 Node 契约测试 + Baritone JUnit + Perimeter Digger Plus JUnit
+powershell -ExecutionPolicy Bypass -File scripts/test-local.ps1 -MinecraftDir "<你的.minecraft路径>"
+
+# 安装单包 JAR 到 mods/（自动禁用旧版 Perimeter / 独立 Baritone JAR）
+powershell -ExecutionPolicy Bypass -File scripts/install-local.ps1 -ModsDir "<你的mods目录>"
+```
+
+---
+
+## 仓库目录结构
 
 ```text
-/perimeterdig detect <boundaryBlock> <boundaryY>
-/perimeterdig config set digging_min_y <Y>
-/perimeterdig config set digging_max_y <Y>
-/perimeterdig start
+Perimeter-Digger-Plus/
+├── src/                # 主模组、客户端与 JUnit 单测源码（modid: perimeter-digger-plus）
+├── baritone/           # 随仓维护的自定义 Baritone 分支（LGPL-3.0）
+├── printer-patch/      # 可选的 litematica-printer-26.2-3.2.2 兼容性源码补丁
+├── agent/              # 可选本地 HTTP 接口 Node.js 客户端与契约测试
+├── scripts/            # 可移植 PowerShell 构建、测试与安装脚本
+├── .github/workflows/  # CI 工作流配置
+├── build.gradle        # Fabric Loom 构建脚本
+├── gradle.properties   # Minecraft / Fabric / 模组版本属性
+├── README.md           # 英文说明文档（主文档）
+├── README.zh-CN.md     # 简体中文说明文档
+└── LICENSE             # GPL-3.0-or-later
 ```
 
-示例：
+---
 
-```text
-/perimeterdig detect minecraft:red_wool 80
-/perimeterdig config set digging_min_y -59
-/perimeterdig config set digging_max_y 79
-/perimeterdig start
-```
+## 开发路线图
 
-正交或对角接触的边界方块视为同一个边界组件。最外圈边界列不会被挖。一圈内还有子圈时，子圈内部不会被挖，但子圈边界方块所在的列仍属于挖掘区域；继续嵌套时按奇偶层交替判断。
+- [x] Minecraft 26.2 + Fabric Loader 0.20.1+ 单包 Jar-in-Jar 整合版
+- [x] F9 五标签配置页、3D 选区渲染、Litematica 投影读取、`/fly` 飞行挖掘、搭路/填水分离与全链路防卡死加固
+- [x] 逐层投影自动打印、水体优化放置、多点/潜影盒补料与向下气泡柱寻路脱困策略
+- [ ] 适配更多 Minecraft 版本
+- [ ] 适配更多模组加载器（NeoForge / Forge 等）
+- [ ] 完善界面多语言本地化
 
-探测面积没有配置上限，但只能读取客户端渲染距离内已加载的区块。
+---
 
-## 指令
+## 开源协议与致谢
 
-### 运行与状态
-
-| 指令 | 说明 |
-| --- | --- |
-| `/perimeterdig` | 显示当前状态和详情。 |
-| `/perimeterdig start` | 验证区域并启动自动化；未配置的可选设施只会禁用对应行为。 |
-| `/perimeterdig stop` | 停止自动化并释放 Baritone 输入。 |
-| `/perimeterdig pause` | 暂停正在进行的挖掘。 |
-| `/perimeterdig resume` | 恢复暂停的挖掘。 |
-| `/perimeterdig status` | 显示当前状态、详情、目标和重试次数。 |
-| `/perimeterdig status clear` | 停止并清除运行时缓存，不删除配置。 |
-| `/perimeterdig status history` | 显示最新 16 条状态转换。 |
-| `/perimeterdig status history all` | 最多显示 64 条状态转换。 |
-| `/perimeterdig status history clear` | 清除状态转换历史。 |
-| `/perimeterdig reload` | 重新读取当前世界的配置并重置运行状态。 |
-
-### 区域与基础配置
-
-| 指令 | 说明 |
-| --- | --- |
-| `/perimeterdig detect <block> <Y>` | 探测封闭的不规则区域。 |
-| `/perimeterdig plan rectangle <x0> <z0> <x1> <z1> <minY> <maxY>` | 创建包含边界的矩形区域和 Y 范围。 |
-| `/perimeterdig config` | 显示当前配置。 |
-| `/perimeterdig config show` | 显示当前配置。 |
-| `/perimeterdig config clear detected_area` | 删除已保存的区域。 |
-| `/perimeterdig config set digging_min_y <Y>` | 设置包含在内的最低挖掘 Y。 |
-| `/perimeterdig config set digging_max_y <Y>` | 设置包含在内的最高挖掘 Y。 |
-
-### 设施点位
-
-所有点位均使用方块坐标 `<x> <y> <z>`：
-
-```text
-/perimeterdig config set consumable_supply_point <x> <y> <z>
-/perimeterdig config set durability_supply_point <x> <y> <z>
-/perimeterdig config set bed_point <x> <y> <z>
-/perimeterdig config set perimeter_portal_overworld <x> <y> <z>
-/perimeterdig config set perimeter_portal_nether <x> <y> <z>
-/perimeterdig config set repair_portal_overworld <x> <y> <z>
-/perimeterdig config set repair_portal_nether <x> <y> <z>
-/perimeterdig config set furnace_row_start <x> <y> <z>
-/perimeterdig config set furnace_row_end <x> <y> <z>
-```
-
-补给点填写箱子方块坐标，床点填写床方块坐标。熔炉排必须沿一个坐标轴排列，只保存首尾两个熔炉位置。床、补给箱和熔炉统一寻找附近站位，并让玩家眼睛与目标方块中心的距离进入 3 格以内再进行交互。
-
-正常挖掘时所有设施均为可选项。缺少点位或路线只会跳过对应自动行为；调试指令仍要求其测试流程所需的设施已经配置。
-
-### 卸货点
-
-```text
-/perimeterdig config set unloading_point <name> <x> <minY> <z>
-/perimeterdig config remove unloading_point <name>
-/perimeterdig config add unloading_whitelist <item>
-/perimeterdig config remove unloading_whitelist <item>
-```
-
-卸货点表示给定 XZ 的竖直通道，Y 表示通道最低 Y。可以配置多个具名通道。Mod 会寻找 XZ 距离最短的安全站立方块，并优先选择接近玩家当前 Y 的位置；随后移动到距离方块边缘内缩 0.2 格的位置，潜行并面向通道中心丢出物品。
-
-可损坏物品、工具、可装备物品、鞘翅、烟花、配置的食物和白名单物品会被保留，其他物品均视为挖掘产物。
-
-### 流体处理
-
-```text
-/perimeterdig config set liquid_policy avoid
-/perimeterdig config set liquid_policy replace
-/perimeterdig config set liquid_policy seal_boundary
-/perimeterdig config add sealing_block <block>
-/perimeterdig config remove sealing_block <block>
-```
-
-默认策略为 `seal_boundary`，默认封堵方块为 `minecraft:netherrack`。封堵方块列表为空时仍允许开始挖掘。
-
-### 食物与耐久策略
-
-```text
-/perimeterdig config add food <item>
-/perimeterdig config remove food <item>
-/perimeterdig config set durability_recovery_mode repair_portal
-/perimeterdig config set durability_recovery_mode supply_point
-```
-
-默认食物为 `minecraft:enchanted_golden_apple`。
-
-- `repair_portal`：依次经过待挖掘区域传送门和经验熔炉传送门，使用经验熔炉修复带经验修补的工具/鞘翅。
-- `supply_point`：把低耐久工具/鞘翅放入补给处的箱子，取出耐久更高的替换品并自动装备。
-
-无论采用哪一种远程策略，都会优先尝试背包内已有的同类耐久更高替换品。
-
-### 功能开关
-
-```text
-/perimeterdig function
-/perimeterdig function enable <function>
-/perimeterdig function disable <function>
-```
-
-可用功能：
-
-| 功能 | 默认值 | 禁用后的行为 |
-| --- | --- | --- |
-| `collect_drops` | `true` | 跳过每批挖掘结束后的掉落物收集；背包已满仍可触发卸货。 |
-| `unload` | `true` | 不再自动卸货。 |
-| `eat` | `true` | 不再自动进食。 |
-| `durability_recovery` | `true` | 不前往补给点或经验熔炉；仍允许使用背包内耐久更高的替代品。 |
-| `cross_dimension_repair` | `true` | 直接前往当前维度中的经验熔炉，而不是走跨维度传送门。 |
-| `resupply` | `true` | 不再补充食物或烟花。 |
-| `elytra_navigation` | `true` | 禁用鞘翅寻路、烟花不足触发的前往补给点，以及鞘翅耐久替换或恢复；工具耐久处理仍然启用。 |
-| `sleep` | `false` | 夜间不自动睡觉。 |
-
-### 高级配置
-
-```text
-/perimeterdig config_advanced
-/perimeterdig config_advanced show
-/perimeterdig config_advanced set <key> <value>
-```
-
-| 分类 | 配置键与默认值 |
-| --- | --- |
-| 耐久 | `tool_durability_threshold=32`、`elytra_durability_threshold=32`、`emergency_flight_durability_threshold=5` |
-| 消耗品 | `food_level_threshold=14`、`health_eating_threshold=16`、`food_resupply_trigger=1`、`food_resupply_target=64`、`firework_resupply_trigger=10`、`firework_resupply_target=128` |
-| 挖掘与卸货 | `drop_collection_radius=8`、`drop_collection_stable_seconds=1.5`、`inventory_reserved_slots=1`、`mining_blocks_per_empty_slot=64`、`unload_landing_search_radius=16`、`unload_edge_inset=0.2` |
-| 寻路 | `elytra_navigation_min_distance=32`、`navigation_stall_timeout_seconds=10`、`navigation_retry_count=2`、`flight_retry_count=2`、`portal_transition_cost=16`、`portal_transition_timeout_seconds=20` |
-| 传送门出口 | `portal_exit_timeout_seconds=20`、`portal_exit_min_radius=3`、`portal_exit_max_radius=8`、`portal_exit_vertical_radius=4` |
-| 交互 | `repair_experience_stable_seconds=1.5`、`supply_interaction_timeout_seconds=2`、`furnace_interaction_timeout_seconds=2` |
-
-所有值都会进行范围检查，相关的最小/最大值以及触发量/目标量会进行联合校验。
-配置键和当前值都支持基础的 Tab 补全。
-
-### 调试流程
-
-| 指令 | 说明 |
-| --- | --- |
-| `/perimeterdig debug unload` | 单独执行卸货流程。 |
-| `/perimeterdig debug supply consumables` | 测试消耗品补给箱拿取流程。 |
-| `/perimeterdig debug supply durability` | 测试耐久补给点替换流程。 |
-| `/perimeterdig debug repair` | 测试经验熔炉维修流程。 |
-| `/perimeterdig debug sleep` | 测试自动睡觉。 |
-
-## 自动化行为
-
-默认每批挖掘上限为 `(主物品栏空槽数 - 1) * 64`。
-
-只剩一个空槽时，本批上限为一个方块。判断背包是否已满时不考虑副手。
-
-每批结束后会收集水平距离 8 格以内的掉落物，直到物品栏物品总数约 1.5 秒没有增加。卸货完成后，会先返回记录的挖掘出发点再继续。
-
-饱食度不高于 14 时会自动进食；生命值不高于 16 且饱食度未满时也会进食。
-
-配置食物总数不高于 1 时补到 64，烟花不高于 10 时补到 128。消耗品补给优先于远程耐久恢复。
-
-主物品栏和副手内的所有可损坏工具都会被监视。只有启用 `elytra_navigation` 时，才会监视已装备或携带的鞘翅。剩余耐久不高于 32 时，先寻找本地耐久更高的替代品，再执行配置的恢复策略。紧急行程中可以继续使用剩余耐久高于 5 的鞘翅。
-
-前去经验熔炉修复时会逐个取出产物。经验仍在吸收时会切换待维修目标；耐久停止增长后才访问下一个熔炉；所有目标修满后立即返回。前往熔炉时会逐个尝试处于交互距离内且视线无遮挡的附近站位，所有候选均失败后才会报告熔炉及最后尝试的站位。禁用 `cross_dimension_repair` 后只要求配置经验熔炉的坐标，按当前维度解释，往返过程不会使用传送门。
-
-Baritone 的疾跑和跑酷始终启用。
-
-所有非挖掘目的地均禁止放置方块；前往待挖掘区域传送门时允许挖掘，但维修行程离开挖掘区域后的其他阶段同时禁止挖掘和放置。
-
-适合时先尝试步行；目标较远或无法直接向上步行时使用鞘翅。寻路系统的 watchdog 会在报告错误前重试停滞路线。
-
-## 配置与翻译
-
-每个世界的 JSON 配置保存在：
-
-```text
-config/perimeter-digger/worlds/<world-id>.json
-```
-
-每个服务器地址和单人存档使用独立文件。
-配置带有 schema 版本；旧的无版本文件会自动迁移，比当前程序更新且不受支持的 schema 会拒绝加载。
-运行中的任务进度不会生成检查点，也不支持断线重连后自动恢复任务。
-
-语言资源位于 `assets/perimeter-digger/lang/en_us.json` 和 `zh_cn.json`。状态历史保存翻译键及参数，因此会按客户端当前语言渲染。
-构建测试会要求两个语言文件具有相同的有序键和兼容的占位符。
-
-## 构建
-
-构建需要魔改版 Baritone API JAR；未经修改的普通 Baritone 不包含本 Mod 使用的 API。当前兼容的已发布依赖为 [Baritone Fabric 26.1.1 hr.1](https://github.com/HackerRouter/baritone/releases/tag/v26.1.1-hr.1)。
-
-未指定 `baritone_jar` 时，Gradle 会使用 `build.gradle` 中配置的本地开发路径。如果本机没有相邻的 Baritone 源码仓库，请显式指定已发布 JAR 的路径。
-
-Windows：
-
-```text
-gradlew.bat clean build -Pbaritone_jar="C:\path\to\baritone-api-fabric-26.1.1-hr.1.jar"
-```
-
-Linux：
-
-```text
-./gradlew clean build -Pbaritone_jar=/path/to/baritone-api-fabric-26.1.1-hr.1.jar
-```
-
-仓库 workflow 会自动下载这个固定版本的 Baritone Release、验证 SHA-256，并通过 `baritone_jar` 参数传给 Gradle。
-
-生成的 Mod JAR 位于 `build/libs/`。
-
-## 许可证
-
-版权所有 (C) 2026 HackerRouter。
-
-Perimeter Digger 是自由软件，使用 [GNU 通用公共许可证第 3 版或任何后续版本](LICENSE)（`GPL-3.0-or-later`）。你可以按照该许可证的条款重新分发和修改本项目。本项目不提供任何担保，包括对适销性或特定用途适用性的默示担保。
-
-除非另有明确声明，提交到本仓库的贡献均按 `GPL-3.0-or-later` 许可。
-
-魔改版 Baritone 与 Nether Pathfinder 项目仍分别遵循其各自仓库中的许可证和声明。本项目对其名称和链接的引用仅用于标识依赖关系，并不表示这些项目的代码被本项目重新许可。
-
-编译时会自动向 Java 源文件添加本项目的许可证文件头。也可以运行 `./gradlew licenseFormat`（Windows 使用 `gradlew.bat licenseFormat`）显式应用。
+- **Perimeter Digger Plus** 基于 **GNU General Public License v3.0 or later** 协议开源，详见 [`LICENSE`](LICENSE)。
+- 上游项目：[HackerRouter/Perimeter-Digger](https://github.com/HackerRouter/Perimeter-Digger)（`Copyright (C) 2026 HackerRouter`，GPL-3.0-or-later）。
+- 内置修改版 Baritone（[`baritone/`](baritone/)）基于 **GNU Lesser General Public License v3.0** 协议开源，详见 [`baritone/LICENSE`](baritone/LICENSE)，衍生自 [cabaletta/baritone](https://github.com/cabaletta/baritone) 与 [HackerRouter/baritone](https://github.com/HackerRouter/baritone)。
+- 可选兼容性补丁（[`printer-patch/`](printer-patch/) 与 `litematica-printer-26.2-3.2.2-patched.jar`）修改自 [aleksilassila/litematica-printer](https://github.com/aleksilassila/litematica-printer)（原协议：**CC0-1.0**）。

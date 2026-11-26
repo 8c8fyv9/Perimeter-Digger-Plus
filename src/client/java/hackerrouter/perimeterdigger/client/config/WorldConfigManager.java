@@ -88,7 +88,7 @@ public final class WorldConfigManager {
 		}
 		identity = currentIdentity;
 		String fileName = UUID.nameUUIDFromBytes(identity.getBytes(StandardCharsets.UTF_8)) + ".json";
-		path = FabricLoader.getInstance().getConfigDir().resolve("perimeter-digger").resolve("worlds").resolve(fileName);
+		path = FabricLoader.getInstance().getConfigDir().resolve("perimeter-digger-plus").resolve("worlds").resolve(fileName);
 		if (!Files.exists(path)) {
 			config = new PerimeterConfig();
 			return;

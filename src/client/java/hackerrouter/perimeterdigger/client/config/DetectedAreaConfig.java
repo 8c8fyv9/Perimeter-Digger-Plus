@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class DetectedAreaConfig {
+	public String dimension;
 	public String boundaryBlock;
 	public int boundaryY;
 	public long columnCount;

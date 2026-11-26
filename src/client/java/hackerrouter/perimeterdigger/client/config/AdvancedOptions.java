@@ -99,7 +99,13 @@ public final class AdvancedOptions {
 			option("supply_interaction_timeout_seconds", "Interaction", "supply timeout seconds", a -> a.supplyInteractionTimeoutSeconds,
 					(a, key, value) -> a.supplyInteractionTimeoutSeconds = positive(key, value)),
 			option("furnace_interaction_timeout_seconds", "Interaction", "furnace timeout seconds", a -> a.furnaceInteractionTimeoutSeconds,
-					(a, key, value) -> a.furnaceInteractionTimeoutSeconds = positive(key, value))
+					(a, key, value) -> a.furnaceInteractionTimeoutSeconds = positive(key, value)),
+			option("mining_stall_timeout_seconds", "Mining stall", "stall timeout seconds", a -> a.miningStallTimeoutSeconds,
+					(a, key, value) -> a.miningStallTimeoutSeconds = positive(key, value)),
+			option("mining_stall_movement_distance", "Mining stall", "stall movement distance", a -> a.miningStallMovementDistance,
+					(a, key, value) -> a.miningStallMovementDistance = positiveInteger(key, value)),
+			option("mining_stall_cooldown_seconds", "Mining stall", "stall cooldown seconds", a -> a.miningStallCooldownSeconds,
+					(a, key, value) -> a.miningStallCooldownSeconds = nonNegative(key, value))
 	);
 	private static final Map<String, AdvancedOption> BY_KEY = index();
 

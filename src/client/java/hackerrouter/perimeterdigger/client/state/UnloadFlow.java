@@ -33,6 +33,7 @@ final class UnloadFlow {
 	int candidateIndex;
 	int flightAttempts;
 	int settleTicks;
+	int positioningTicks;
 	boolean debugOnly;
 
 	void reset() {
@@ -42,6 +43,7 @@ final class UnloadFlow {
 		candidateIndex = 0;
 		flightAttempts = 0;
 		settleTicks = 0;
+		positioningTicks = 0;
 		debugOnly = false;
 	}
 

@@ -37,10 +37,13 @@ import hackerrouter.perimeterdigger.client.config.ScanlineConfig;
 import hackerrouter.perimeterdigger.client.config.UnloadingPointConfig;
 import hackerrouter.perimeterdigger.client.config.WorldConfigManager;
 import hackerrouter.perimeterdigger.client.detect.BoundaryDetector;
+import hackerrouter.perimeterdigger.client.detect.LitematicaFootprintReader;
 import hackerrouter.perimeterdigger.client.state.AutomationController;
 import hackerrouter.perimeterdigger.client.state.StateTransition;
 import hackerrouter.perimeterdigger.client.translation.Translations;
+import hackerrouter.perimeterdigger.client.ui.ConfigGuiModel;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.Minecraft;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -74,9 +77,11 @@ public final class PerimeterCommand {
 	);
 	private final WorldConfigManager configs;
 	private final AutomationController controller;
+	private final java.util.function.BooleanSupplier agentOwned;
 	private final BoundaryDetector detector = new BoundaryDetector();
 
-	public PerimeterCommand(WorldConfigManager configs, AutomationController controller) {
+	public PerimeterCommand(WorldConfigManager configs, AutomationController controller, java.util.function.BooleanSupplier agentOwned) {
+		this.agentOwned = agentOwned;
 		this.configs = configs;
 		this.controller = controller;
 	}
@@ -117,6 +122,7 @@ public final class PerimeterCommand {
 
 	private LiteralArgumentBuilder<FabricClientCommandSource> buildPlan() {
 		return literal("plan")
+				.then(literal("litematica").executes(this::planFromLitematica))
 				.then(literal("rectangle")
 						.then(argument("x0", IntegerArgumentType.integer())
 								.suggests(coordinate(source -> source.getPlayer().getBlockX()))
@@ -163,11 +169,46 @@ public final class PerimeterCommand {
 			liquidPolicy.then(literal(policy).executes(context -> setLiquidPolicy(context, policy)));
 		}
 		set.then(liquidPolicy);
+		LiteralArgumentBuilder<FabricClientCommandSource> miningStrategy = literal("mining_strategy");
+		for (String strategy : List.of("global_top_down", "local_top_down", "chunk_top_down")) {
+			miningStrategy.then(literal(strategy).executes(context -> setMiningStrategy(context, strategy)));
+		}
+		set.then(miningStrategy);
 		LiteralArgumentBuilder<FabricClientCommandSource> durabilityRecoveryMode = literal("durability_recovery_mode");
 		for (String mode : List.of("repair_portal", "supply_point")) {
 			durabilityRecoveryMode.then(literal(mode).executes(context -> setDurabilityRecoveryMode(context, mode)));
 		}
 		set.then(durabilityRecoveryMode);
+		LiteralArgumentBuilder<FabricClientCommandSource> workModeCmd = literal("work_mode");
+		for (String mode : List.of("mine", "build_schematic")) {
+			workModeCmd.then(literal(mode).executes(context -> setSchematicOption(context, "work_mode", mode)));
+		}
+		set.then(workModeCmd);
+		LiteralArgumentBuilder<FabricClientCommandSource> wrongPolicyCmd = literal("wrong_block_policy");
+		for (String policy : List.of("skip", "break_and_place")) {
+			wrongPolicyCmd.then(literal(policy).executes(context -> setSchematicOption(context, "wrong_block_policy", policy)));
+		}
+		set.then(wrongPolicyCmd);
+		LiteralArgumentBuilder<FabricClientCommandSource> missingPolicyCmd = literal("missing_material_policy");
+		for (String policy : List.of("place_available", "pause_immediately")) {
+			missingPolicyCmd.then(literal(policy).executes(context -> setSchematicOption(context, "missing_material_policy", policy)));
+		}
+		set.then(missingPolicyCmd);
+		LiteralArgumentBuilder<FabricClientCommandSource> clearExtraCmd = literal("clear_extra_blocks");
+		for (String flag : List.of("true", "false")) {
+			clearExtraCmd.then(literal(flag).executes(context -> setSchematicOption(context, "clear_extra_blocks", flag)));
+		}
+		set.then(clearExtraCmd);
+		LiteralArgumentBuilder<FabricClientCommandSource> optimizeWaterCmd = literal("optimize_water");
+		for (String flag : List.of("true", "false")) {
+			optimizeWaterCmd.then(literal(flag).executes(context -> setSchematicOption(context, "optimize_water", flag)));
+		}
+		set.then(optimizeWaterCmd);
+		LiteralArgumentBuilder<FabricClientCommandSource> bubbleEscapeCmd = literal("bubble_escape_mode");
+		for (String mode : ConfigGuiModel.BUBBLE_COLUMN_ESCAPE_MODES) {
+			bubbleEscapeCmd.then(literal(mode).executes(context -> setSchematicOption(context, "bubble_escape_mode", mode)));
+		}
+		set.then(bubbleEscapeCmd);
 		for (String key : POINT_KEYS) {
 			set.then(pointSetter(key, this::setPoint));
 		}
@@ -175,6 +216,9 @@ public final class PerimeterCommand {
 				.then(argument("name", StringArgumentType.word())
 						.suggests(unloadingNames(true))
 						.then(coordinateArguments(context -> setUnloadingPoint(context)))));
+		set.then(literal("resource_point")
+				.then(argument("name", StringArgumentType.word())
+						.then(coordinateArguments(this::setResourcePoint))));
 		config.then(set);
 		config.then(literal("add")
 				.then(literal("sealing_block")
@@ -188,12 +232,23 @@ public final class PerimeterCommand {
 				.then(literal("unloading_whitelist")
 						.then(argument("item", ItemIdentifierArgument.itemIdentifier())
 								.suggests(this::suggestItems)
-								.executes(this::addUnloadingWhitelist))));
+								.executes(this::addUnloadingWhitelist)))
+				.then(literal("mining_whitelist")
+						.then(argument("block", BlockIdentifierArgument.blockIdentifier())
+								.suggests(this::suggestBlocks)
+								.executes(this::addMiningWhitelist)))
+				.then(literal("mining_blacklist")
+						.then(argument("block", BlockIdentifierArgument.blockIdentifier())
+								.suggests(this::suggestBlocks)
+								.executes(this::addMiningBlacklist))));
 		LiteralArgumentBuilder<FabricClientCommandSource> remove = literal("remove");
 		remove.then(literal("unloading_point")
 						.then(argument("name", StringArgumentType.word())
 								.suggests(unloadingNames(false))
 								.executes(this::removeUnloadingPoint)));
+		remove.then(literal("resource_point")
+						.then(argument("name", StringArgumentType.word())
+								.executes(this::removeResourcePoint)));
 		remove.then(literal("sealing_block")
 				.then(argument("block", BlockIdentifierArgument.blockIdentifier())
 						.suggests(sealingBlockNames())
@@ -206,6 +261,14 @@ public final class PerimeterCommand {
 				.then(argument("item", ItemIdentifierArgument.itemIdentifier())
 						.suggests(unloadingWhitelistNames())
 						.executes(this::removeUnloadingWhitelist)));
+		remove.then(literal("mining_whitelist")
+				.then(argument("block", BlockIdentifierArgument.blockIdentifier())
+						.suggests(miningWhitelistNames())
+						.executes(this::removeMiningWhitelist)));
+		remove.then(literal("mining_blacklist")
+				.then(argument("block", BlockIdentifierArgument.blockIdentifier())
+						.suggests(miningBlacklistNames())
+						.executes(this::removeMiningBlacklist)));
 		config.then(remove);
 		return config;
 	}
@@ -215,6 +278,7 @@ public final class PerimeterCommand {
 			PositionConfig position = position(context);
 			setter.accept(key, position);
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("set_value", key, position));
 			return 1;
 		}));
@@ -242,6 +306,7 @@ public final class PerimeterCommand {
 			DetectedAreaConfig area = detector.detect(block, id, y);
 			configs.get().detectedArea = area;
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("detected", area.columnCount, area.scanlines.size(), area.minX, area.maxX, area.minZ, area.maxZ));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -265,6 +330,10 @@ public final class PerimeterCommand {
 			int minZ = Math.min(z0, z1);
 			int maxZ = Math.max(z0, z1);
 			DetectedAreaConfig area = new DetectedAreaConfig();
+			var level = net.minecraft.client.Minecraft.getInstance().level;
+			if (level != null) {
+				area.dimension = level.dimension().identifier().toString();
+			}
 			area.boundaryBlock = "rectangle";
 			area.boundaryY = maxY;
 			area.minX = minX;
@@ -281,7 +350,34 @@ public final class PerimeterCommand {
 			config.diggingMinY = minY;
 			config.diggingMaxY = maxY;
 			configs.save();
+			controller.syncConfig(config);
 			feedback(context, Translations.COMMAND.tr("planned_rectangle", area.columnCount, minX, maxX, minZ, maxZ, minY, maxY));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int planFromLitematica(CommandContext<FabricClientCommandSource> context) {
+		try {
+			LitematicaFootprintReader.ReadResult result = LitematicaFootprintReader.readCurrentFootprint(Minecraft.getInstance());
+			if (!result.ok()) {
+				return error(context, result.userMessage());
+			}
+			LitematicaFootprintReader.Footprint fp = result.footprint();
+			DetectedAreaConfig area = ConfigGuiModel.buildRectangleArea(
+					fp.minX(), fp.minZ(), fp.maxX(), fp.maxZ(), fp.minY(), fp.maxY());
+			var level = Minecraft.getInstance().level;
+			if (level != null) {
+				area.dimension = level.dimension().identifier().toString();
+			}
+			PerimeterConfig config = configs.get();
+			config.detectedArea = area;
+			config.diggingMinY = fp.minY();
+			config.diggingMaxY = fp.maxY();
+			configs.save();
+			controller.syncConfig(config);
+			feedback(context, Component.literal(result.userMessage()).withStyle(ChatFormatting.GREEN));
 			return 1;
 		} catch (RuntimeException exception) {
 			return error(context, exception.getMessage());
@@ -295,6 +391,7 @@ public final class PerimeterCommand {
 			if (minimum) config.diggingMinY = y;
 			else config.diggingMaxY = y;
 			configs.save();
+			controller.syncConfig(config);
 			feedback(context, Translations.COMMAND.tr("set_value", minimum ? "digging_min_y" : "digging_max_y", y));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -306,7 +403,20 @@ public final class PerimeterCommand {
 		try {
 			configs.get().liquidPolicy = policy;
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("set_value", "liquid_policy", policy));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int setMiningStrategy(CommandContext<FabricClientCommandSource> context, String strategy) {
+		try {
+			configs.get().miningStrategy = strategy;
+			configs.save();
+			controller.updateMiningStrategy(strategy);
+			feedback(context, Translations.COMMAND.tr("set_value", "mining_strategy", strategy));
 			return 1;
 		} catch (RuntimeException exception) {
 			return error(context, exception.getMessage());
@@ -317,7 +427,29 @@ public final class PerimeterCommand {
 		try {
 			configs.get().durabilityRecoveryMode = mode;
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("set_value", "durability_recovery_mode", mode));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int setSchematicOption(CommandContext<FabricClientCommandSource> context, String key, String value) {
+		try {
+			PerimeterConfig cfg = configs.get();
+			switch (key) {
+				case "work_mode" -> cfg.workMode = value;
+				case "wrong_block_policy" -> cfg.schematicWrongBlockPolicy = value;
+				case "missing_material_policy" -> cfg.schematicMissingMaterialPolicy = value;
+				case "clear_extra_blocks" -> cfg.schematicClearExtraBlocks = Boolean.parseBoolean(value);
+				case "optimize_water" -> cfg.schematicOptimizeWater = Boolean.parseBoolean(value);
+				case "bubble_escape_mode" -> cfg.bubbleColumnEscapeMode = value;
+				default -> {}
+			}
+			configs.save();
+			controller.syncConfig(cfg);
+			feedback(context, Component.literal("已设置 " + key + " = " + value));
 			return 1;
 		} catch (RuntimeException exception) {
 			return error(context, exception.getMessage());
@@ -332,6 +464,7 @@ public final class PerimeterCommand {
 			String value = id.toString();
 			if (!configs.get().sealingBlocks.contains(value)) configs.get().sealingBlocks.add(value);
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("added_value", configText("sealing_block"), value));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -346,6 +479,7 @@ public final class PerimeterCommand {
 			if (!configs.get().sealingBlocks.contains(value)) return error(context, Translations.COMMAND.tr("error_sealing_block_not_configured", value));
 			configs.get().sealingBlocks.remove(value);
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("removed_value", configText("sealing_block"), value));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -361,6 +495,7 @@ public final class PerimeterCommand {
 			String value = id.toString();
 			if (!configs.get().foods.contains(value)) configs.get().foods.add(value);
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("added_value", configText("food"), value));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -374,6 +509,7 @@ public final class PerimeterCommand {
 			String value = id.toString();
 			if (!configs.get().foods.remove(value)) return error(context, Translations.COMMAND.tr("error_food_not_configured", value));
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("removed_value", configText("food"), value));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -388,6 +524,7 @@ public final class PerimeterCommand {
 			String value = id.toString();
 			if (!configs.get().unloadingWhitelist.contains(value)) configs.get().unloadingWhitelist.add(value);
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("added_value", configText("unloading_whitelist_item"), value));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -401,7 +538,68 @@ public final class PerimeterCommand {
 			String value = id.toString();
 			if (!configs.get().unloadingWhitelist.remove(value)) return error(context, Translations.COMMAND.tr("error_not_whitelisted", value));
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("removed_value", configText("unloading_whitelist_item"), value));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int addMiningWhitelist(CommandContext<FabricClientCommandSource> context) {
+		try {
+			Identifier id = BlockIdentifierArgument.getIdentifier(context, "block");
+			Block block = BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+			if (block == null || block.defaultBlockState().isAir()) return error(context, Translations.COMMAND.tr("error_invalid_mining_whitelist_block"));
+			String value = id.toString();
+			if (!configs.get().miningWhitelist.contains(value)) configs.get().miningWhitelist.add(value);
+			configs.save();
+			controller.updateMiningWhitelist(configs.get().miningWhitelist);
+			feedback(context, Translations.COMMAND.tr("added_value", configText("mining_whitelist_block"), value));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int removeMiningWhitelist(CommandContext<FabricClientCommandSource> context) {
+		try {
+			Identifier id = BlockIdentifierArgument.getIdentifier(context, "block");
+			String value = id.toString();
+			if (!configs.get().miningWhitelist.remove(value)) return error(context, Translations.COMMAND.tr("error_mining_whitelist_not_configured", value));
+			configs.save();
+			controller.updateMiningWhitelist(configs.get().miningWhitelist);
+			feedback(context, Translations.COMMAND.tr("removed_value", configText("mining_whitelist_block"), value));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int addMiningBlacklist(CommandContext<FabricClientCommandSource> context) {
+		try {
+			Identifier id = BlockIdentifierArgument.getIdentifier(context, "block");
+			Block block = BuiltInRegistries.BLOCK.getOptional(id).orElse(null);
+			if (block == null || block.defaultBlockState().isAir()) return error(context, Translations.COMMAND.tr("error_invalid_mining_blacklist_block"));
+			String value = id.toString();
+			if (!configs.get().miningBlacklist.contains(value)) configs.get().miningBlacklist.add(value);
+			configs.save();
+			controller.updateMiningBlacklist(configs.get().miningBlacklist);
+			feedback(context, Translations.COMMAND.tr("added_value", configText("mining_blacklist_block"), value));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int removeMiningBlacklist(CommandContext<FabricClientCommandSource> context) {
+		try {
+			Identifier id = BlockIdentifierArgument.getIdentifier(context, "block");
+			String value = id.toString();
+			if (!configs.get().miningBlacklist.remove(value)) return error(context, Translations.COMMAND.tr("error_mining_blacklist_not_configured", value));
+			configs.save();
+			controller.updateMiningBlacklist(configs.get().miningBlacklist);
+			feedback(context, Translations.COMMAND.tr("removed_value", configText("mining_blacklist_block"), value));
 			return 1;
 		} catch (RuntimeException exception) {
 			return error(context, exception.getMessage());
@@ -430,6 +628,7 @@ public final class PerimeterCommand {
 			PositionConfig position = position(context);
 			configs.get().unloadingPoints.put(name, new UnloadingPointConfig(position.x, position.y, position.z));
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("set_unloading_point", name, position.x, position.y, position.z));
 			return 1;
 		} catch (RuntimeException exception) {
@@ -444,7 +643,38 @@ public final class PerimeterCommand {
 				return error(context, Translations.COMMAND.tr("error_unknown_unloading_point", name));
 			}
 			configs.save();
+			controller.syncConfig(configs.get());
 			feedback(context, Translations.COMMAND.tr("removed_value", configText("unloading_point"), name));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int setResourcePoint(CommandContext<FabricClientCommandSource> context) {
+		try {
+			String name = normalizedName(StringArgumentType.getString(context, "name"));
+			PositionConfig position = position(context);
+			ConfigGuiModel.setNamedSchematicResourcePoint(configs.get(), null, name, position);
+			configs.save();
+			controller.syncConfig(configs.get());
+			feedback(context, Component.literal("已设置投影资源点 " + name + " = (" + position.x + ", " + position.y + ", " + position.z + ")"));
+			return 1;
+		} catch (RuntimeException exception) {
+			return error(context, exception.getMessage());
+		}
+	}
+
+	private int removeResourcePoint(CommandContext<FabricClientCommandSource> context) {
+		try {
+			String name = normalizedName(StringArgumentType.getString(context, "name"));
+			if (!configs.get().schematicResourcePoints.containsKey(name)) {
+				return error(context, "未找到投影资源点：" + name);
+			}
+			ConfigGuiModel.removeNamedSchematicResourcePoint(configs.get(), name);
+			configs.save();
+			controller.syncConfig(configs.get());
+			feedback(context, Component.literal("已删除投影资源点：" + name));
 			return 1;
 		} catch (RuntimeException exception) {
 			return error(context, exception.getMessage());
@@ -463,6 +693,7 @@ public final class PerimeterCommand {
 	}
 
 	private int start(CommandContext<FabricClientCommandSource> context) {
+		if (agentOwned.getAsBoolean()) return error(context, "An Agent owns this task; use its API to control it or stop first.");
 		try {
 			List<String> missing = controller.start(configs.get());
 			if (!missing.isEmpty()) {
@@ -476,6 +707,7 @@ public final class PerimeterCommand {
 	}
 
 	private int debugUnload(CommandContext<FabricClientCommandSource> context) {
+		if (agentOwned.getAsBoolean()) return error(context, "An Agent owns this task; use its API to control it or stop first.");
 		try {
 			List<String> missing = controller.debugStage5(configs.get());
 			if (!missing.isEmpty()) {
@@ -489,6 +721,7 @@ public final class PerimeterCommand {
 	}
 
 	private int debugSupply(CommandContext<FabricClientCommandSource> context, boolean durability) {
+		if (agentOwned.getAsBoolean()) return error(context, "An Agent owns this task; use its API to control it or stop first.");
 		try {
 			List<String> missing = controller.debugStage6(configs.get(), durability);
 			if (!missing.isEmpty()) {
@@ -502,6 +735,7 @@ public final class PerimeterCommand {
 	}
 
 	private int debugRepair(CommandContext<FabricClientCommandSource> context) {
+		if (agentOwned.getAsBoolean()) return error(context, "An Agent owns this task; use its API to control it or stop first.");
 		try {
 			List<String> missing = controller.debugStage7(configs.get());
 			if (!missing.isEmpty()) {
@@ -515,6 +749,7 @@ public final class PerimeterCommand {
 	}
 
 	private int debugSleep(CommandContext<FabricClientCommandSource> context) {
+		if (agentOwned.getAsBoolean()) return error(context, "An Agent owns this task; use its API to control it or stop first.");
 		try {
 			List<String> missing = controller.debugSleep(configs.get());
 			if (!missing.isEmpty()) {
@@ -548,6 +783,7 @@ public final class PerimeterCommand {
 	}
 
 	private int resume(CommandContext<FabricClientCommandSource> context) {
+		if (agentOwned.getAsBoolean()) return error(context, "An Agent owns this task; use its API to control it or stop first.");
 		try {
 			configs.reload();
 			controller.resume(configs.get());
@@ -630,6 +866,7 @@ public final class PerimeterCommand {
 			feedback(context, category(configText("liquid"))
 					.append(Component.literal(": ").withStyle(ChatFormatting.GRAY))
 					.append(field(configText("policy"), config.liquidPolicy)).append(separator())
+					.append(field(configText("mining_strategy"), config.miningStrategy)).append(separator())
 					.append(field(configText("sealing_blocks"), listValue(config.sealingBlocks)))
 					.append(Component.literal(".").withStyle(ChatFormatting.GRAY)));
 			feedback(context, category(configText("resources"))
@@ -640,7 +877,9 @@ public final class PerimeterCommand {
 			feedback(context, configText("navigation_note").withStyle(ChatFormatting.GRAY));
 			feedback(context, category(configText("unloading"))
 					.append(Component.literal(": ").withStyle(ChatFormatting.GRAY))
-					.append(field(configText("whitelist"), listValue(config.unloadingWhitelist)))
+					.append(field(configText("whitelist"), listValue(config.unloadingWhitelist))).append(separator())
+					.append(field(configText("mining_whitelist"), listValue(config.miningWhitelist))).append(separator())
+					.append(field(configText("mining_blacklist"), listValue(config.miningBlacklist)))
 					.append(Component.literal(".").withStyle(ChatFormatting.GRAY)));
 			feedback(context, category(configText("locations"))
 					.append(Component.literal(": ").withStyle(ChatFormatting.GRAY))
@@ -683,6 +922,26 @@ public final class PerimeterCommand {
 		return (context, builder) -> {
 			try {
 				return SharedSuggestionProvider.suggest(configs.get().sealingBlocks, builder);
+			} catch (RuntimeException exception) {
+				return builder.buildFuture();
+			}
+		};
+	}
+
+	private SuggestionProvider<FabricClientCommandSource> miningWhitelistNames() {
+		return (context, builder) -> {
+			try {
+				return SharedSuggestionProvider.suggest(configs.get().miningWhitelist, builder);
+			} catch (RuntimeException exception) {
+				return builder.buildFuture();
+			}
+		};
+	}
+
+	private SuggestionProvider<FabricClientCommandSource> miningBlacklistNames() {
+		return (context, builder) -> {
+			try {
+				return SharedSuggestionProvider.suggest(configs.get().miningBlacklist, builder);
 			} catch (RuntimeException exception) {
 				return builder.buildFuture();
 			}

@@ -1,39 +1,35 @@
-# gradle
-
+# Gradle & local build outputs
 .gradle/
 build/
 out/
 classes/
+printer-patch/classes/
+baritone/.gradle/
+baritone/build/
+baritone/out/
+baritone/bin/
 
-# eclipse
+# Local dependencies & logs
+deps/
+baritone/deps/
+logs/
+*.log
 
+# IDE
 *.launch
-
-# idea
-
 .idea/
 *.iml
 *.ipr
 *.iws
-
-# vscode
-
 .settings/
 .vscode/
 bin/
 .classpath
 .project
+.DS_Store
 
-# macos
-
-*.DS_Store
-
-# fabric
-
+# Fabric / JVM
 run/
-
-# java
-
 hs_err_*.log
 replay_*.log
 *.hprof

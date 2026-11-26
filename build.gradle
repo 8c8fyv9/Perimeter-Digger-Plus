@@ -14,7 +14,7 @@ loom {
 	splitEnvironmentSourceSets()
 
 	mods {
-		"perimeter-digger" {
+		"perimeter-digger-plus" {
 			sourceSet sourceSets.main
 			sourceSet sourceSets.client
 		}
@@ -22,7 +22,7 @@ loom {
 }
 
 def baritoneJar = findProperty("baritone_jar")
-        ?: "../baritone/fabric/build/libs/baritone-fabric-1.11.1-21-g918ea5fc-dirty.jar"
+        ?: "baritone/build/libs/baritone-api-fabric-26.2-local.1.jar"
 
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"

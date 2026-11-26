@@ -24,9 +24,17 @@ public final class FunctionConfig {
 	public boolean collectDrops = true;
 	public boolean unload = true;
 	public boolean eat = true;
+	public boolean durabilityProtection = true;
 	public boolean durabilityRecovery = true;
 	public boolean crossDimensionRepair = true;
 	public boolean resupply = true;
 	public boolean elytraNavigation = true;
 	public boolean sleep = false;
+	public boolean renderArea = true;
+	public boolean flightMovement = true;
+	public boolean miningWhitelist = false;
+	public boolean miningBlacklist = false;
+	public boolean autoSwapBackpackTool = true;
+	public boolean autoReplaceLowDurabilityTool = true;
+	public boolean autoSwapBackpackFood = true;
 }

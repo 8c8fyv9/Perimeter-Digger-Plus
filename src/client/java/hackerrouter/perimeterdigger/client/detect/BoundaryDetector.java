@@ -289,6 +289,7 @@ public final class BoundaryDetector {
 				throw new IllegalStateException("The detected mining area is empty.");
 			}
 			DetectedAreaConfig area = new DetectedAreaConfig();
+			area.dimension = level.dimension().identifier().toString();
 			area.boundaryBlock = boundaryId.toString();
 			area.boundaryY = boundaryY;
 			area.minX = Integer.MAX_VALUE;

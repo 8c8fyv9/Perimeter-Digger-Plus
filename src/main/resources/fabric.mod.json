@@ -1,16 +1,17 @@
 {
 	"schemaVersion": 1,
-	"id": "perimeter-digger",
+	"id": "perimeter-digger-plus",
 	"version": "${version}",
-	"name": "Perimeter Digger",
-	"description": "A staged Baritone-powered perimeter auto miner.",
+	"name": "Perimeter Digger Plus",
+	"description": "Enhanced Baritone-powered perimeter auto-miner & layer-by-layer schematic builder (all-in-one Jar-in-Jar).",
 	"authors": [
-		"HackerRouter"
+		"HackerRouter",
+		"8c8fyv9"
 	],
 	"contact": {
-    "homepage": "https://github.com/HackerRouter/Perimeter-Digger",
-    "sources": "https://github.com/HackerRouter/Perimeter-Digger",
-    "issues": "https://github.com/HackerRouter/Perimeter-Digger/issues"
+		"homepage": "https://github.com/8c8fyv9/Perimeter-Digger-Plus",
+		"sources": "https://github.com/8c8fyv9/Perimeter-Digger-Plus",
+		"issues": "https://github.com/8c8fyv9/Perimeter-Digger-Plus/issues"
 	},
 
 	"license": "GPL-3.0-or-later",
@@ -24,11 +25,15 @@
 			"hackerrouter.perimeterdigger.client.PerimeterDiggerClient"
 		]
 	},
+	"mixins": ["perimeter-digger.mixins.json"],
 	"depends": {
-		"fabricloader": ">=0.19.3",
-		"minecraft": "~26.1.1",
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.2",
 		"java": ">=25",
 		"fabric-api": "*",
-		"baritone": "*"
+		"baritone": "1.18.0+mc26.2.local.1"
+	},
+	"breaks": {
+		"perimeter-digger": "*"
 	}
 }
