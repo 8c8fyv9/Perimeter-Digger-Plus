@@ -94,11 +94,11 @@
 - Minecraft **26.2**
 - **Fabric Loader 0.20.1+** 与 **Fabric API**
 - **Java 25+**
-- *（可选）* **Litematica**（与 `litematica-printer`，用于一键读取投影或逐层自动建造；若需搭配 `printInAir=true` 建造半砖/红石火把/栅栏/告示牌/剥皮原木，建议使用基于 `printer-patch/` 构建的补丁版）
+- *（可选）* **Litematica**（与 `litematica-printer`，用于一键读取投影或逐层自动建造；**如使用逐层投影打印，强烈建议使用我们维护的补丁版打印机** `litematica-printer-26.2-3.2.2-patched.jar`，可在 Releases 下载或由 [`printer-patch/`](printer-patch/) 构建，已修复半砖、红石火把、栅栏/栅栏门/石墙、告示牌与原木剥皮 5 类错放）
 
 ### 使用步骤
 1. 将 `perimeter-digger-plus-<version>.jar` 放入 `.minecraft/mods/` 目录。
-   > **注意：** **不要**同时安装独立版 Baritone JAR 或上游原版 `perimeter-digger`，本模组已内置自定义 Baritone。
+   > **重要说明（Baritone 不共存）：** 本模组内置并自行维护了定制版 Baritone（衍生自上游 `perimeter-digger` 的 Baritone 分支），包含完整 Baritone 功能（可直接正常使用 `#goto`、`#mine` 等全部 `#` 指令）**且与其他任何单独安装的 Baritone 模组互不共存**（也不与原版 `perimeter-digger` 共存）。安装前请务必移除 `mods/` 中单独的 Baritone JAR。
 2. 启动游戏并进入世界。
 3. **长按 `F9`**（约 400ms）打开图形配置界面：
    - 在「选区控制」页切换「自动挖掘 / 投影打印」。

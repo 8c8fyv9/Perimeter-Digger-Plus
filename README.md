@@ -97,11 +97,11 @@ An enhanced fork of [HackerRouter/Perimeter-Digger](https://github.com/HackerRou
 - Minecraft **26.2**
 - **Fabric Loader 0.20.1+** and **Fabric API**
 - **Java 25+**
-- *(Optional)* **Litematica** (and `litematica-printer` for automated schematic printing; use the patched `litematica-printer-26.2-3.2.2-patched.jar` if building slabs/torches/fences/signs/stripped logs with `printInAir=true`)
+- *(Optional)* **Litematica** (and `litematica-printer` for automated schematic printing — **we recommend using our maintained patched version** `litematica-printer-26.2-3.2.2-patched.jar` from Releases or [`printer-patch/`](printer-patch/), which fixes slabs, torches, fences/gates/walls, signs, and log stripping)
 
 ### Setup
 1. Place `perimeter-digger-plus-<version>.jar` into your `.minecraft/mods/` directory.
-   > **Important:** Do **not** install a standalone Baritone JAR or upstream `perimeter-digger` alongside Perimeter Digger Plus. Baritone is already bundled inside the JAR.
+   > **Important (Baritone Compatibility):** This mod bundles and maintains its own customized Baritone fork (derived from the upstream `perimeter-digger` Baritone fork) via Jar-in-Jar. It includes full Baritone functionality (including `#` commands) and **cannot coexist with any separately installed Baritone JAR** (or upstream `perimeter-digger`). Remove any standalone Baritone mod from `mods/`.
 2. Launch the game and enter your world.
 3. **Hold `F9`** (~400 ms) to open the configuration screen:
    - Choose **Auto Mining** or **Schematic Printing** in the Area & Control tab.
